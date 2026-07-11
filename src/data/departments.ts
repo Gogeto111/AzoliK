@@ -1,0 +1,258 @@
+import {
+  MessageSquare,
+  TrendingUp,
+  Megaphone,
+  Settings2,
+  Calculator,
+  Users,
+} from "lucide-react";
+import type { DepartmentConfig, DepartmentId, ToolId } from "@/types";
+
+export const DEPARTMENT_TOOLS: Record<DepartmentId, { id: ToolId; name: string; description: string; icon: string }[]> = {
+  support: [
+    { id: "whatsapp", name: "WhatsApp Business", description: "Send & reply to customer messages", icon: "💬" },
+    { id: "faqs", name: "Search FAQs", description: "Search knowledge base instantly", icon: "📚" },
+    { id: "inventory", name: "Check Inventory", description: "Real-time product availability", icon: "📦" },
+    { id: "orders", name: "Track Orders", description: "Check order status & shipping", icon: "🚚" },
+    { id: "calendar_book", name: "Book Appointments", description: "Schedule calls & meetings", icon: "📅" },
+    { id: "gmail", name: "Send Emails", description: "Reply via email when needed", icon: "✉️" },
+  ],
+  sales: [
+    { id: "crm", name: "Update CRM", description: "Log deals & update stages", icon: "🎯" },
+    { id: "gmail", name: "Send Follow-ups", description: "Personalized outreach emails", icon: "✉️" },
+    { id: "payments", name: "Generate Payment Links", description: "Create Razorpay/Stripe links", icon: "💳" },
+    { id: "calendar", name: "Schedule Meetings", description: "Book calls with leads", icon: "📅" },
+    { id: "hubspot", name: "HubSpot Sync", description: "Sync leads & pipeline", icon: "🔄" },
+    { id: "zoho", name: "Zoho CRM", description: "Update contact records", icon: "📊" },
+  ],
+  marketing: [
+    { id: "social", name: "Create Social Posts", description: "Generate content for Instagram, LinkedIn, X", icon: "📱" },
+    { id: "email_marketing", name: "Create Emails", description: "Campaign emails & newsletters", icon: "✉️" },
+    { id: "calendar", name: "Schedule Campaigns", description: "Plan & schedule posts", icon: "📅" },
+    { id: "slack", name: "Slack Notifications", description: "Alert team on approvals", icon: "💬" },
+    { id: "notion", name: "Content Calendar", description: "Save to Notion database", icon: "📝" },
+    { id: "shopify", name: "Promo Products", description: "Create discount campaigns", icon: "🛍️" },
+  ],
+  finance: [
+    { id: "gmail", name: "Read Bills", description: "Parse incoming invoices from email", icon: "📧" },
+    { id: "sheets", name: "Update Google Sheets", description: "Log expenses & revenue", icon: "📊" },
+    { id: "invoices", name: "Send Invoices", description: "Generate & send GST invoices", icon: "🧾" },
+    { id: "expenses", name: "Track Expenses", description: "Categorize & flag anomalies", icon: "💸" },
+    { id: "razorpay", name: "Razorpay", description: "Verify payments & payouts", icon: "💳" },
+    { id: "stripe", name: "Stripe", description: "Process subscriptions", icon: "🃏" },
+  ],
+  operations: [
+    { id: "inventory", name: "Update Inventory", description: "Sync stock across channels", icon: "📦" },
+    { id: "orders", name: "Manage Orders", description: "Process, ship & track", icon: "🚚" },
+    { id: "shopify", name: "Shopify Sync", description: "Update products & stock", icon: "🛍️" },
+    { id: "woo", name: "WooCommerce", description: "Sync e-commerce data", icon: "🏪" },
+    { id: "slack", name: "Team Coordination", description: "Notify & coordinate teams", icon: "💬" },
+    { id: "notion", name: "Task Logs", description: "Record decisions in Notion", icon: "📝" },
+  ],
+  hr: [
+    { id: "gmail", name: "Send Emails", description: "Candidate & employee comms", icon: "✉️" },
+    { id: "calendar", name: "Schedule Interviews", description: "Book interview slots", icon: "📅" },
+    { id: "sheets", name: "Track Candidates", description: "Update hiring pipeline", icon: "📊" },
+    { id: "slack", name: "Slack Alerts", description: "Notify hiring managers", icon: "💬" },
+    { id: "notion", name: "Onboarding Docs", description: "Create docs for new hires", icon: "📝" },
+    { id: "outlook", name: "Outlook Calendar", description: "Cross-platform scheduling", icon: "📆" },
+  ],
+};
+
+export const DEPARTMENTS: DepartmentConfig[] = [
+  {
+    id: "support",
+    name: "Support",
+    tagline: "Customer happiness, 24/7",
+    personality: "Patient, empathetic, solution-driven. Speaks in warm, clear language. Never leaves a customer waiting.",
+    systemPrompt: "You are Priya, Head of Customer Support at Northwind Labs. You handle every customer message with warmth and speed. You always verify facts by checking inventory, orders, and FAQs before responding. You escalate to Sales or Finance when a customer is ready to buy or needs billing help, and to Operations for stock issues.",
+    icon: MessageSquare,
+    color: {
+      primary: "#22d3ee",
+      bg: "from-cyan-500/30 to-cyan-700/10",
+      text: "text-cyan-200",
+      glow: "rgba(34,211,238,0.5)",
+    },
+    tools: DEPARTMENT_TOOLS.support.map((t) => t.id),
+    agents: [
+      { id: "s1", name: "Inbox Resolver", role: "Tier-1 Support Agent", avatar: "IR", status: "active", tasksCompleted: 8421, successRate: 98 },
+      { id: "s2", name: "Order Tracker", role: "Logistics Specialist", avatar: "OT", status: "active", tasksCompleted: 4321, successRate: 99 },
+      { id: "s3", name: "Knowledge Scout", role: "FAQ & Knowledge Lead", avatar: "KS", status: "active", tasksCompleted: 2142, successRate: 97 },
+      { id: "s4", name: "Escalation Manager", role: "Complex Cases", avatar: "EM", status: "idle", tasksCompleted: 412, successRate: 95 },
+    ],
+    permissions: ["read_messages", "send_messages", "read_orders", "read_inventory", "book_calendar", "escalate"],
+    stats: { tasksToday: 1284, successRate: 98, avgResponseTime: "1.8s", customersHelped: 847, hoursSaved: 142 },
+    memory: { totalEntries: 4823, lastAccessed: Date.now() },
+    integrations: ["whatsapp", "gmail", "faqs", "inventory", "orders", "calendar_book"],
+    status: "active",
+    onlineSince: Date.now() - 1000 * 60 * 60 * 72,
+  },
+  {
+    id: "sales",
+    name: "Sales",
+    tagline: "Turn interest into revenue",
+    personality: "Energetic, confident, consultative. Knows when to push and when to listen. Never wastes a lead.",
+    systemPrompt: "You are Marcus, Head of Sales at Northwind Labs. You qualify leads fast, send sharp follow-ups, and close deals. You work with Support to understand customer context and Finance to generate invoices. You update the CRM after every interaction — no deal ever falls through the cracks.",
+    icon: TrendingUp,
+    color: {
+      primary: "#34d399",
+      bg: "from-emerald-500/30 to-emerald-700/10",
+      text: "text-emerald-200",
+      glow: "rgba(52,211,153,0.5)",
+    },
+    tools: DEPARTMENT_TOOLS.sales.map((t) => t.id),
+    agents: [
+      { id: "sa1", name: "Lead Qualifier", role: "Inbound SDR", avatar: "LQ", status: "active", tasksCompleted: 2142, successRate: 92 },
+      { id: "sa2", name: "Deal Desk", role: "Quote & Contract Lead", avatar: "DD", status: "active", tasksCompleted: 841, successRate: 96 },
+      { id: "sa3", name: "Follow-up Engine", role: "Pipeline Nurturer", avatar: "FE", status: "busy", tasksCompleted: 3214, successRate: 90 },
+    ],
+    permissions: ["read_leads", "write_crm", "send_emails", "create_quotes", "create_payment_links", "schedule_meetings"],
+    stats: { tasksToday: 642, successRate: 92, avgResponseTime: "3.2s", revenueGenerated: 48210, hoursSaved: 98 },
+    memory: { totalEntries: 2142, lastAccessed: Date.now() },
+    integrations: ["crm", "gmail", "payments", "calendar", "hubspot", "zoho"],
+    status: "active",
+    onlineSince: Date.now() - 1000 * 60 * 60 * 48,
+  },
+  {
+    id: "marketing",
+    name: "Marketing",
+    tagline: "Tell the story that grows us",
+    personality: "Creative, data-informed, on-brand. Tests everything. Never publishes without knowing the audience.",
+    systemPrompt: "You are Elena, Head of Marketing at Northwind Labs. You create on-brand content across channels, schedule campaigns, and measure results. You coordinate with Sales to align on promotions and with Operations before announcing new products.",
+    icon: Megaphone,
+    color: {
+      primary: "#a78bfa",
+      bg: "from-violet-500/30 to-violet-700/10",
+      text: "text-violet-200",
+      glow: "rgba(167,139,250,0.5)",
+    },
+    tools: DEPARTMENT_TOOLS.marketing.map((t) => t.id),
+    agents: [
+      { id: "m1", name: "Brief Writer", role: "Content Strategist", avatar: "BW", status: "active", tasksCompleted: 621, successRate: 94 },
+      { id: "m2", name: "Campaign Runner", role: "Paid & Scheduled Ads", avatar: "CR", status: "training", tasksCompleted: 189, successRate: 88 },
+      { id: "m3", name: "Social Poster", role: "Organic Social Lead", avatar: "SP", status: "active", tasksCompleted: 1242, successRate: 95 },
+    ],
+    permissions: ["create_content", "schedule_posts", "read_analytics", "send_emails", "update_products"],
+    stats: { tasksToday: 328, successRate: 91, avgResponseTime: "4.1s", hoursSaved: 76 },
+    memory: { totalEntries: 1842, lastAccessed: Date.now() - 60000 },
+    integrations: ["social", "email_marketing", "calendar", "slack", "notion", "shopify"],
+    status: "training",
+  },
+  {
+    id: "finance",
+    name: "Finance",
+    tagline: "Every rupee, accounted for",
+    personality: "Meticulous, calm, compliant. Trusts nothing until reconciled. Protects the bottom line.",
+    systemPrompt: "You are Nisha, CFO at Northwind Labs. You reconcile books, generate invoices, track expenses, and produce reports. You receive payment data from Sales and process payouts. You flag anomalies instantly.",
+    icon: Calculator,
+    color: {
+      primary: "#fb7185",
+      bg: "from-rose-500/30 to-rose-700/10",
+      text: "text-rose-200",
+      glow: "rgba(251,113,133,0.5)",
+    },
+    tools: DEPARTMENT_TOOLS.finance.map((t) => t.id),
+    agents: [
+      { id: "f1", name: "Invoice Matcher", role: "AP/AR Reconciliation", avatar: "IM", status: "active", tasksCompleted: 1242, successRate: 99 },
+      { id: "f2", name: "Expense Auditor", role: "Anomaly Detection", avatar: "EA", status: "active", tasksCompleted: 421, successRate: 97 },
+    ],
+    permissions: ["read_bills", "ocr_receipts", "send_invoices", "write_sheets", "read_payments", "generate_reports"],
+    stats: { tasksToday: 187, successRate: 99, avgResponseTime: "2.5s", revenueGenerated: 0, hoursSaved: 62 },
+    memory: { totalEntries: 3821, lastAccessed: Date.now() - 120000 },
+    integrations: ["gmail", "sheets", "invoices", "expenses", "razorpay", "stripe"],
+    status: "active",
+    onlineSince: Date.now() - 1000 * 60 * 60 * 96,
+  },
+  {
+    id: "operations",
+    name: "Operations",
+    tagline: "The engine that keeps running",
+    personality: "Process-obsessed, calm under pressure. Coordinates everything. Never drops a handoff.",
+    systemPrompt: "You are Jordan, COO at Northwind Labs. You keep inventory, orders, and inter-department work flowing. You receive stock and order updates from Sales and Support and dispatch work to every team. You are the company's central nervous system.",
+    icon: Settings2,
+    color: {
+      primary: "#fbbf24",
+      bg: "from-amber-500/30 to-amber-700/10",
+      text: "text-amber-200",
+      glow: "rgba(251,191,36,0.5)",
+    },
+    tools: DEPARTMENT_TOOLS.operations.map((t) => t.id),
+    agents: [
+      { id: "o1", name: "Stock Keeper", role: "Inventory Sync Lead", avatar: "SK", status: "active", tasksCompleted: 2142, successRate: 99 },
+      { id: "o2", name: "Order Router", role: "Fulfillment Coordinator", avatar: "OR", status: "active", tasksCompleted: 4321, successRate: 98 },
+      { id: "o3", name: "Workflow Orchestrator", role: "Cross-team Handoffs", avatar: "WO", status: "active", tasksCompleted: 1842, successRate: 97 },
+    ],
+    permissions: ["update_inventory", "manage_orders", "create_tasks", "coordinate_teams", "sync_ecommerce"],
+    stats: { tasksToday: 903, successRate: 98, avgResponseTime: "2.1s", hoursSaved: 184 },
+    memory: { totalEntries: 2942, lastAccessed: Date.now() - 30000 },
+    integrations: ["inventory", "orders", "shopify", "woo", "slack", "notion"],
+    status: "active",
+    onlineSince: Date.now() - 1000 * 60 * 60 * 120,
+  },
+  {
+    id: "hr",
+    name: "HR",
+    tagline: "Your team, cared for",
+    personality: "Warm, organized, discreet. Builds a great place to work. Remembers every candidate.",
+    systemPrompt: "You are Anjali, Head of People at Northwind Labs. You screen candidates, schedule interviews, coordinate onboarding, and answer policy questions. You work with Hiring Managers across departments and keep all candidate data private.",
+    icon: Users,
+    color: {
+      primary: "#8faeff",
+      bg: "from-brand-500/30 to-brand-700/10",
+      text: "text-brand-200",
+      glow: "rgba(143,174,255,0.5)",
+    },
+    tools: DEPARTMENT_TOOLS.hr.map((t) => t.id),
+    agents: [
+      { id: "h1", name: "Resume Screener", role: "Candidate Screening", avatar: "RS", status: "idle", tasksCompleted: 248, successRate: 93 },
+      { id: "h2", name: "Onboarding Buddy", role: "New Hire Experience", avatar: "OB", status: "active", tasksCompleted: 42, successRate: 100 },
+    ],
+    permissions: ["screen_candidates", "schedule_interviews", "send_emails", "update_pipeline", "create_docs"],
+    stats: { tasksToday: 142, successRate: 94, avgResponseTime: "5.2s", hoursSaved: 34 },
+    memory: { totalEntries: 842, lastAccessed: Date.now() - 300000 },
+    integrations: ["gmail", "calendar", "sheets", "slack", "notion", "outlook"],
+    status: "idle",
+  },
+];
+
+// Memory seeds (simulated business memory)
+export const INITIAL_MEMORY = [
+  { type: "policy", key: "Returns: 7 days for unused items", source: "operations", confidence: 1 },
+  { type: "policy", key: "Free shipping above ₹999", source: "operations", confidence: 1 },
+  { type: "product", key: "Wireless Earbuds Pro: in stock (142 units)", source: "operations", confidence: 0.98 },
+  { type: "product", key: "Leather Wallet: low stock (8 units)", source: "operations", confidence: 0.96 },
+  { type: "customer", key: "Priya Sharma (priya@northwind.com) · VIP · prefers WhatsApp", source: "support", confidence: 0.9 },
+  { type: "customer", key: "Marcus Chen · Acme Corp · $50K ARR · enterprise deal in flight", source: "sales", confidence: 1 },
+  { type: "preference", key: "Brand voice: warm, concise, no jargon", source: "marketing", confidence: 1 },
+  { type: "policy", key: "Working hours: Mon-Sat 10am-7pm IST", source: "hr", confidence: 1 },
+  { type: "conversation", key: "Elena Rossi approved Q3 campaign budget", source: "marketing", confidence: 0.95 },
+];
+
+// Tool catalog (all available integrations) — brand icons not present in this
+// lucide-react build are represented via a small branded letter component.
+import {
+  MessageCircle, Mail, Table, CalendarDays, ShoppingBag, ShoppingCart,
+  CreditCard, FileText, Target, Grid3X3, Briefcase,
+} from "lucide-react";
+import { makeBrandBadge } from "@/components/ui/BrandBadge";
+
+const SlackIcon = makeBrandBadge("Sl");
+const DiscordIcon = makeBrandBadge("Di");
+const StripeIcon = makeBrandBadge("St");
+
+export const INTEGRATION_CATALOG = [
+  { id: "whatsapp", name: "WhatsApp Business", icon: MessageCircle, category: "communication", color: "#25D366", description: "Send & receive customer messages" },
+  { id: "gmail", name: "Gmail", icon: Mail, category: "communication", color: "#EA4335", description: "Email & threads" },
+  { id: "outlook", name: "Microsoft Outlook", icon: Briefcase, category: "communication", color: "#0078D4", description: "Calendar & email" },
+  { id: "slack", name: "Slack", icon: SlackIcon, category: "communication", color: "#E01E5A", description: "Team notifications" },
+  { id: "discord", name: "Discord", icon: DiscordIcon, category: "communication", color: "#5865F2", description: "Community & alerts" },
+  { id: "sheets", name: "Google Sheets", icon: Table, category: "productivity", color: "#34A853", description: "Data & reports" },
+  { id: "notion", name: "Notion", icon: FileText, category: "productivity", color: "#ffffff", description: "Docs & databases" },
+  { id: "calendar", name: "Google Calendar", icon: CalendarDays, category: "productivity", color: "#4285F4", description: "Meetings & scheduling" },
+  { id: "shopify", name: "Shopify", icon: ShoppingBag, category: "ecommerce", color: "#96BF48", description: "Products & orders" },
+  { id: "woo", name: "WooCommerce", icon: ShoppingCart, category: "ecommerce", color: "#7F54B3", description: "WordPress store" },
+  { id: "razorpay", name: "Razorpay", icon: CreditCard, category: "payments", color: "#0F2683", description: "Indian payments" },
+  { id: "stripe", name: "Stripe", icon: StripeIcon, category: "payments", color: "#635BFF", description: "Global payments" },
+  { id: "hubspot", name: "HubSpot CRM", icon: Target, category: "crm", color: "#FF7A59", description: "Inbound & pipeline" },
+  { id: "zoho", name: "Zoho CRM", icon: Grid3X3, category: "crm", color: "#E42528", description: "Sales CRM" },
+];
