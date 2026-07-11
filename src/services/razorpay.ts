@@ -273,14 +273,18 @@ class RazorpayService {
   }
 
   // Verify webhook signature
-  verifyWebhookSignature(payload: string, signature: string): boolean {
+  async verifyWebhookSignature(payload: string, signature: string): Promise<boolean> {
     // Only works in Node.js environment (Firebase Functions)
     if (typeof window !== "undefined") {
       console.warn("Webhook verification should run server-side");
       return false;
     }
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const crypto = require("crypto");
+    const crypto = require("crypto") as {
+      createHmac: (algorithm: string, key: string) => {
+        update: (data: string) => { digest: (encoding: string) => string };
+      };
+    };
     const expectedSignature = crypto
       .createHmac("sha256", this.keySecret)
       .update(payload)
@@ -360,5 +364,3 @@ export const workforceEngine = {
 
 const razorpayService = new RazorpayService();
 export { razorpayService };
-
-export { INDUSTRIES_META };
