@@ -41,6 +41,9 @@ export const apiConfig = {
   },
 };
 
+export const razorpayConfig = apiConfig.razorpay;
+export const shopifyConfig = apiConfig.shopify;
+
 // App Config
 export const appConfig = {
   name: "Azolik",

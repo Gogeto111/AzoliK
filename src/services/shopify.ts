@@ -1,6 +1,6 @@
 // Shopify Integration Service - Real Shopify API Integration
 import { shopifyConfig } from "@/config/app";
-import { getDoc, doc, updateDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { getDoc, doc, updateDoc, setDoc, collection, query, where, getDocs, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export interface ShopifyProduct {
@@ -39,9 +39,6 @@ export interface ShopifyVariant {
   inventory_quantity: number;
   old_inventory_quantity: number;
   requires_shipping: boolean;
-  taxable: boolean;
-  fulfillment_service: string;
-  inventory_management: string;
 }
 
 export interface ShopifyOrder {
@@ -95,14 +92,19 @@ export interface ShopifyOrder {
   fulfillment_status: string | null;
   tags: string;
   contact_email: string;
-  order_number: number;
   presentment_currency: string;
+  customer?: {
+    id: number;
+    email: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+  };
   line_items: ShopifyLineItem[];
   fulfillments: any[];
   refunds: any[];
   total_tip_received: string;
   original_total_duties_set: boolean;
-  currency: string;
 }
 
 export interface ShopifyLineItem {
@@ -209,21 +211,24 @@ export class ShopifyService {
   }
 
   async getProduct(productId: number): Promise<ShopifyProduct> {
-    return this.request<{ product: ShopifyProduct }>(`/products/${productId}.json`);
+    const response = await this.request<{ product: ShopifyProduct }>(`/products/${productId}.json`);
+    return response.product;
   }
 
   async createProduct(product: Partial<ShopifyProduct>): Promise<ShopifyProduct> {
-    return this.request<{ product: ShopifyProduct }>("/products.json", {
+    const response = await this.request<{ product: ShopifyProduct }>("/products.json", {
       method: "POST",
       body: JSON.stringify({ product }),
     });
+    return response.product;
   }
 
   async updateProduct(productId: number, product: Partial<ShopifyProduct>): Promise<ShopifyProduct> {
-    return this.request<{ product: ShopifyProduct }>(`/products/${productId}.json`, {
+    const response = await this.request<{ product: ShopifyProduct }>(`/products/${productId}.json`, {
       method: "PUT",
       body: JSON.stringify({ product }),
     });
+    return response.product;
   }
 
   async deleteProduct(productId: number): Promise<void> {
@@ -233,18 +238,21 @@ export class ShopifyService {
   // ==================== VARIANTS ====================
 
   async getVariants(productId: number): Promise<ShopifyVariant[]> {
-    return this.request<{ variants: ShopifyVariant[] }>(`/products/${productId}/variants.json`);
+    const response = await this.request<{ variants: ShopifyVariant[] }>(`/products/${productId}/variants.json`);
+    return response.variants;
   }
 
   async getVariant(variantId: number): Promise<ShopifyVariant> {
-    return this.request<{ variant: ShopifyVariant }>(`/variants/${variantId}.json`);
+    const response = await this.request<{ variant: ShopifyVariant }>(`/variants/${variantId}.json`);
+    return response.variant;
   }
 
   async updateVariant(variantId: number, variant: Partial<ShopifyVariant>): Promise<ShopifyVariant> {
-    return this.request<{ variant: ShopifyVariant }>(`/variants/${variantId}.json`, {
+    const response = await this.request<{ variant: ShopifyVariant }>(`/variants/${variantId}.json`, {
       method: "PUT",
       body: JSON.stringify({ variant }),
     });
+    return response.variant;
   }
 
   async updateVariantInventory(variantId: number, quantity: number): Promise<ShopifyVariant> {
@@ -254,13 +262,14 @@ export class ShopifyService {
   // ==================== INVENTORY ====================
 
   async getInventoryLevels(locationId?: number): Promise<ShopifyInventoryLevel[]> {
-    return this.request<{ inventory_levels: ShopifyInventoryLevel[] }>(
+    const response = await this.request<{ inventory_levels: ShopifyInventoryLevel[] }>(
       locationId ? `/inventory_levels.json?location_ids=${locationId}` : "/inventory_levels.json"
     );
+    return response.inventory_levels;
   }
 
   async adjustInventoryLevel(inventoryItemId: number, locationId: number, availableAdjustment: number): Promise<ShopifyInventoryLevel> {
-    return this.request<{ inventory_level: ShopifyInventoryLevel }>(`/inventory_levels/adjust.json`, {
+    const response = await this.request<{ inventory_level: ShopifyInventoryLevel }>(`/inventory_levels/adjust.json`, {
       method: "POST",
       body: JSON.stringify({
         inventory_item_id: inventoryItemId,
@@ -268,10 +277,11 @@ export class ShopifyService {
         available_adjustment: availableAdjustment,
       }),
     });
+    return response.inventory_level;
   }
 
   async setInventoryLevel(inventoryItemId: number, locationId: number, available: number): Promise<ShopifyInventoryLevel> {
-    return this.request<{ inventory_level: ShopifyInventoryLevel }>(`/inventory_levels/set.json`, {
+    const response = await this.request<{ inventory_level: ShopifyInventoryLevel }>(`/inventory_levels/set.json`, {
       method: "POST",
       body: JSON.stringify({
         inventory_item_id: inventoryItemId,
@@ -279,6 +289,7 @@ export class ShopifyService {
         available,
       }),
     });
+    return response.inventory_level;
   }
 
   // ==================== ORDERS ====================
@@ -290,8 +301,8 @@ export class ShopifyService {
     fulfillment_status?: "shipped" | "partial" | "unfulfilled" | "any";
     created_at_min?: string;
     created_at_max?: string;
-    limit?: number;
-  }): Promise<{ orders: ShopifyOrder[] }> {
+    page_info?: string;
+  }): Promise<{ orders: ShopifyOrder[]; nextPageInfo?: string }> {
     const params = new URLSearchParams({
       limit: (options?.limit || 50).toString(),
     });
@@ -301,26 +312,30 @@ export class ShopifyService {
     if (options?.fulfillment_status) params.append("fulfillment_status", options.fulfillment_status);
     if (options?.created_at_min) params.append("created_at_min", options.created_at_min);
     if (options?.created_at_max) params.append("created_at_max", options.created_at_max);
+    if (options?.page_info) params.append("page_info", options.page_info);
 
     return this.request<{ orders: ShopifyOrder[] }>(`/orders.json?${params}`);
   }
 
   async getOrder(orderId: number): Promise<ShopifyOrder> {
-    return this.request<{ order: ShopifyOrder }>(`/orders/${orderId}.json`);
+    const response = await this.request<{ order: ShopifyOrder }>(`/orders/${orderId}.json`);
+    return response.order;
   }
 
   async createOrder(order: Partial<ShopifyOrder>): Promise<ShopifyOrder> {
-    return this.request<{ order: ShopifyOrder }>("/orders.json", {
+    const response = await this.request<{ order: ShopifyOrder }>("/orders.json", {
       method: "POST",
       body: JSON.stringify({ order }),
     });
+    return response.order;
   }
 
   async updateOrder(orderId: number, order: Partial<ShopifyOrder>): Promise<ShopifyOrder> {
-    return this.request<{ order: ShopifyOrder }>(`/orders/${orderId}.json`, {
+    const response = await this.request<{ order: ShopifyOrder }>(`/orders/${orderId}.json`, {
       method: "PUT",
       body: JSON.stringify({ order }),
     });
+    return response.order;
   }
 
   async fulfillOrder(orderId: number, fulfillment: {

@@ -1,5 +1,5 @@
 // Razorpay Service - Real Payment Integration
-import { razorpayConfig } from "@/config/app";
+import { razorpayConfig, shopifyConfig } from "@/config/app";
 
 // Types
 export interface RazorpayOrder {
@@ -274,6 +274,12 @@ class RazorpayService {
 
   // Verify webhook signature
   verifyWebhookSignature(payload: string, signature: string): boolean {
+    // Only works in Node.js environment (Firebase Functions)
+    if (typeof window !== "undefined") {
+      console.warn("Webhook verification should run server-side");
+      return false;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const crypto = require("crypto");
     const expectedSignature = crypto
       .createHmac("sha256", this.keySecret)
@@ -345,13 +351,14 @@ export const INDUSTRIES_META: Record<string, { name: string; emoji: string; tagl
   agency: { name: "Creative Agency", emoji: "🎨", tagline: "Leads & projects" },
 };
 
-export { DEPARTMENTS };
+export const DEPARTMENTS = ["support", "sales", "marketing", "finance", "operations", "hr"];
 
 export const workforceEngine = {
   start: () => {},
   stop: () => {},
 };
 
-export { razorpayService } from "./razorpay";
+const razorpayService = new RazorpayService();
+export { razorpayService };
 
 export { INDUSTRIES_META };

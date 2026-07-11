@@ -473,3 +473,5 @@ function getQuestionIconBg(questionId: string) {
 }
 
 export { ONBOARDING_QUESTIONS };
+
+export { DiscoveryStep, ReviewStep, KnowledgeStep, IntegrationsStep, DepartmentsStep, TrainingStep } from "./OnboardingSteps";

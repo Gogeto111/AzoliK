@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { DiscoveryStep, ReviewStep, KnowledgeStep, IntegrationsStep, DepartmentsStep, TrainingStep } from "@/components/onboarding/OnboardingSteps";
 
 const ONBOARDING_STEPS = [
   { id: "landing", label: "Welcome", icon: Sparkles },
@@ -121,9 +122,9 @@ export function OnboardingPage() {
       default:
         return <LandingPage onGetStarted={() => setCurrentStep("auth")} />;
     }
-  };
+    };
 
-  return (
+    return (
     <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950">
       {/* Progress Header */}
       <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-ink-900 border-b border-white/5">
@@ -205,99 +206,3 @@ export function OnboardingPage() {
 }
 
 export default OnboardingPage;
-
-// Placeholder step components (inline to avoid missing module errors)
-function BusinessDiscovery({ onComplete }: { onComplete: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 flex items-center justify-center p-4">
-      <GlassCard className="p-8 max-w-md w-full text-center">
-        <Brain className="h-16 w-16 text-brand-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold text-white mb-2">Business Discovery</h2>
-        <p className="text-ink-400 mb-6">AI will research your business and create a profile</p>
-        <Button onClick={onComplete} className="w-full" size="lg">
-          Start Discovery
-        </Button>
-      </GlassCard>
-    </div>
-  );
-}
-
-function BusinessReview({ data, onConfirm, onBack }: { data: any; onConfirm: () => void; onBack: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 flex items-center justify-center p-4">
-      <GlassCard className="p-8 max-w-md w-full text-center">
-        <CheckCircle2 className="h-16 w-16 text-emerald-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold text-white mb-2">Review Your Business</h2>
-        <p className="text-ink-400 mb-6">Verify the discovered information</p>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={onBack} className="flex-1">Back</Button>
-          <Button onClick={onConfirm} className="flex-1">Confirm</Button>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
-
-function KnowledgeUpload({ onComplete, onSkip }: { onComplete: () => void; onSkip: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 flex items-center justify-center p-4">
-      <GlassCard className="p-8 max-w-md w-full text-center">
-        <FileText className="h-16 w-16 text-brand-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold text-white mb-2">Knowledge Upload</h2>
-        <p className="text-ink-400 mb-6">Upload documents for AI training</p>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={onSkip} className="flex-1">Skip</Button>
-          <Button onClick={onComplete} className="flex-1">Continue</Button>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
-
-function ConnectApps({ onComplete, onSkip }: { onComplete: () => void; onSkip: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 flex items-center justify-center p-4">
-      <GlassCard className="p-8 max-w-md w-full text-center">
-        <Link2 className="h-16 w-16 text-brand-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold text-white mb-2">Connect Apps</h2>
-        <p className="text-ink-400 mb-6">Connect your tools (WhatsApp, Gmail, Sheets, etc.)</p>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={onSkip} className="flex-1">Skip</Button>
-          <Button onClick={onComplete} className="flex-1">Continue</Button>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
-
-function DepartmentGenerator({ onComplete, onSkip }: { onComplete: () => void; onSkip: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 flex items-center justify-center p-4">
-      <GlassCard className="p-8 max-w-md w-full text-center">
-        <Users className="h-16 w-16 text-brand-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold text-white mb-2">Departments</h2>
-        <p className="text-ink-400 mb-6">Select which AI departments to activate</p>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={onSkip} className="flex-1">Skip</Button>
-          <Button onClick={onComplete} className="flex-1">Continue</Button>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
-
-function AITraining({ onComplete, onSkip }: { onComplete: () => void; onSkip: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 flex items-center justify-center p-4">
-      <GlassCard className="p-8 max-w-md w-full text-center">
-        <Cpu className="h-16 w-16 text-brand-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold text-white mb-2">AI Training</h2>
-        <p className="text-ink-400 mb-6">Training your AI workforce...</p>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={onSkip} className="flex-1">Skip</Button>
-          <Button onClick={onComplete} className="flex-1">Complete</Button>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
