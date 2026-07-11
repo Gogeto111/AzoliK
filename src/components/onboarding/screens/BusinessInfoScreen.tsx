@@ -185,7 +185,7 @@ export function BusinessInfoScreen({ onComplete, onBack }: BusinessInfoScreenPro
                     />
                   )}
 
-                  {currentQuestion.type === "select" && (
+                  {currentQuestion.type === "select" && currentQuestion.options && (
                     <select
                       value={answers[currentQuestion.id] || ""}
                       onChange={(e) => handleAnswer(e.target.value)}
@@ -199,7 +199,7 @@ export function BusinessInfoScreen({ onComplete, onBack }: BusinessInfoScreenPro
                     </select>
                   )}
 
-                  {currentQuestion.type === "multiselect" && (
+                  {currentQuestion.type === "multiselect" && currentQuestion.options && (
                     <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
                       {currentQuestion.options.map((opt: any) => {
                         const selected = answers[currentQuestion.id]?.includes(opt.value) || false;

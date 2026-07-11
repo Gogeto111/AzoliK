@@ -80,7 +80,7 @@ export function OnboardingPage() {
       case "business":
         return <BusinessInfoScreen onComplete={() => setCurrentStep("discovery")} onBack={() => setCurrentStep("auth")} />;
       case "discovery":
-        return <AIDiscoveryScreen onComplete={(data) => handleStepComplete("discovery", data)} onBack={() => setCurrentStep("business")} />;
+        return <AIDiscoveryScreen onComplete={() => handleStepComplete("discovery")} onBack={() => setCurrentStep("business")} />;
       case "knowledge":
         return <KnowledgeScreen onComplete={(data) => handleStepComplete("knowledge", data)} onBack={() => setCurrentStep("discovery")} />;
       case "integrations":
@@ -88,7 +88,8 @@ export function OnboardingPage() {
       case "departments":
         return <DepartmentsScreen onComplete={(data) => handleStepComplete("departments", data)} onBack={() => setCurrentStep("integrations")} />;
       case "launch":
-        return <LaunchScreen onComplete={() => setCurrentStep("complete")} />;
+        const selectedDepartments = onboardingData.departments?.departments || ["support", "sales", "finance"];
+        return <LaunchScreen departments={selectedDepartments} onComplete={() => setCurrentStep("complete")} />;
       case "complete":
         return (
           <motion.div

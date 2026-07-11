@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   CheckCircle2, Sparkles, Zap, Shield, Brain, Users, 
-  Briefcase, BarChart3, CreditCard, Settings, Cpu, ArrowRight
+  Briefcase, BarChart3, CreditCard, Settings, Cpu, ArrowRight,
+  MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";

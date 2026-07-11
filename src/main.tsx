@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App.tsx";
 import { BootSplash } from "@/components/effects/BootSplash";
 import { AnimatePresence, motion } from "framer-motion";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
@@ -25,7 +26,9 @@ function Root() {
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         className="h-full"
       >
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </motion.div>
     </>
   );
