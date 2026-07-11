@@ -10,6 +10,11 @@ import {
   Store,
   Settings as SettingsIcon,
   Sparkles,
+  MessageSquare,
+  Bot,
+  BookOpen,
+  Activity,
+  Brain,
   Search,
   Command,
 } from "lucide-react";
@@ -30,9 +35,13 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/departments", label: "Departments", icon: Building2 },
-  { to: "/automation", label: "Workflows", icon: Workflow, badge: { label: "Live", tone: "emerald", dot: true } },
+  { to: "/inbox", label: "Inbox", icon: MessageSquare, badge: { label: "New", tone: "emerald", dot: true } },
+  { to: "/automation", label: "Automation", icon: Workflow, badge: { label: "Live", tone: "emerald", dot: true } },
   { to: "/integrations", label: "Integrations", icon: Blocks },
+  { to: "/knowledge", label: "Knowledge", icon: BookOpen },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/workforce", label: "AI Workforce", icon: Bot, badge: { label: "Live", tone: "brand", dot: true } },
+  { to: "/activity", label: "Activity Feed", icon: Activity },
   { to: "/marketplace", label: "Marketplace", icon: Store, badge: { label: "Soon", tone: "muted" }, comingSoon: true },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];

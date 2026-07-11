@@ -451,7 +451,7 @@ class Engine {
     this.messageTimer = undefined;
   }
 
-  private setDeptStatus(id: DepartmentId, line: string, tone: EngineState["departmentStatus"][DepartmentId]["tone"]) {
+  setDeptStatus(id: DepartmentId, line: string, tone: EngineState["departmentStatus"][DepartmentId]["tone"]) {
     this.state.departmentStatus[id] = {
       ...this.state.departmentStatus[id],
       line,

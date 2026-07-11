@@ -10,12 +10,13 @@ import {
 } from "framer-motion";
 
 type Variant = "primary" | "secondary" | "ghost" | "glass";
-type Size = "sm" | "md" | "lg" | "icon";
+type Size = "xs" | "sm" | "md" | "lg" | "icon";
 
 const base =
   "relative inline-flex items-center justify-center gap-2 font-medium select-none transition-colors duration-200 focus-visible:ring-focus disabled:opacity-50 disabled:pointer-events-none";
 
 const sizeMap: Record<Size, string> = {
+  xs: "h-6 px-2 text-[11px] rounded-lg gap-1",
   sm: "h-8 px-3 text-[13px] rounded-lg gap-1.5",
   md: "h-9.5 px-4 text-[13.5px] rounded-xl gap-2",
   lg: "h-12 px-5.5 text-[14.5px] rounded-2xl gap-2",

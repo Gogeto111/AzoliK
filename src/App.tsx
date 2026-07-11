@@ -9,9 +9,13 @@ import { AssignWork as AssignWorkFAB } from "@/components/os/AssignWork";
 import Dashboard from "@/pages/Dashboard";
 import Departments from "@/pages/Departments";
 import DepartmentDetail from "@/pages/DepartmentDetail";
+import Inbox from "@/pages/Inbox";
 import Automation from "@/pages/Automation";
 import Integrations from "@/pages/Integrations";
+import Knowledge from "@/pages/Knowledge";
 import Analytics from "@/pages/Analytics";
+import AIWorkforce from "@/pages/AIWorkforce";
+import ActivityFeed from "@/pages/ActivityFeed";
 import Marketplace from "@/pages/Marketplace";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
@@ -25,9 +29,13 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/departments" element={<Departments />} />
             <Route path="/departments/:id" element={<DepartmentDetail />} />
+            <Route path="/inbox" element={<Inbox />} />
             <Route path="/automation" element={<Automation />} />
             <Route path="/integrations" element={<Integrations />} />
+            <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/workforce" element={<AIWorkforce />} />
+            <Route path="/activity" element={<ActivityFeed />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />

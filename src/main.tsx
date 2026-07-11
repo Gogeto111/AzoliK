@@ -1,9 +1,18 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 import { BootSplash } from "@/components/effects/BootSplash";
 import { AnimatePresence, motion } from "framer-motion";
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Service worker registration failed silently
+    });
+  });
+}
 
 function Root() {
   const [booted, setBooted] = useState(false);

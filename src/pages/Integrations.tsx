@@ -1,12 +1,16 @@
 import * as React from "react";
-
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Search, Plus, CheckCircle2, Settings2, Activity, RefreshCw, Clock, Link2 } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import {
+  MessageCircle, Mail, Table, CalendarDays, ShoppingBag, ShoppingCart,
+  CreditCard, FileText, Target, Grid3X3, Briefcase,
+  CheckCircle2, Settings2, Activity, RefreshCw, Clock, Link2,
+  Plus, Search, Wifi, WifiOff, AlertTriangle, ExternalLink,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEngine } from "@/lib/engine";
 
@@ -52,10 +56,10 @@ const CATEGORIES = [
 ];
 
 const healthMap = {
-  healthy: { label: "Healthy", tone: "emerald" as const },
-  degraded: { label: "Degraded", tone: "amber" as const },
-  error: { label: "Error", tone: "rose" as const },
-  disconnected: { label: "Not connected", tone: "muted" as const },
+  healthy: { label: "Healthy", tone: "emerald" as const, icon: Wifi },
+  degraded: { label: "Degraded", tone: "amber" as const, icon: AlertTriangle },
+  error: { label: "Error", tone: "rose" as const, icon: AlertTriangle },
+  disconnected: { label: "Not connected", tone: "muted" as const, icon: WifiOff },
 };
 
 export default function Integrations() {
@@ -63,12 +67,9 @@ export default function Integrations() {
   const [cat, setCat] = useState("all");
   const engine = useEngine();
 
-  // Tool calls per integration id (derived from live engine)
   const callCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    engine.toolCalls.forEach((c) => {
-      counts[c.tool] = (counts[c.tool] ?? 0) + 1;
-    });
+    engine.toolCalls.forEach((c) => { counts[c.tool] = (counts[c.tool] ?? 0) + 1; });
     return counts;
   }, [engine.toolCalls.length]);
 
@@ -81,19 +82,19 @@ export default function Integrations() {
   const connected = INTEGRATIONS.filter((i) => i.connected).length;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
-        title="Integrations Center"
+        title="Integrations"
         description="Connect Azolik to every tool your business already runs on. Permissions, sync health, and recent activity for every connector."
         badge={{ label: `${connected} of ${INTEGRATIONS.length} connected`, tone: "emerald", dot: true, pulse: true }}
         actions={
           <Button size="md" variant="primary">
-            <Plus className="h-4 w-4" /> Browse marketplace
+            <Plus className="h-4 w-4" /> Browse Marketplace
           </Button>
         }
       />
 
-      {/* Search + categories */}
+      {/* Search + Categories */}
       <GlassCard noPadding className="mb-5">
         <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
           <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 focus-within:border-brand-400/30 focus-within:ring-2 focus-within:ring-brand-500/20">
@@ -176,6 +177,12 @@ export default function Integrations() {
                       <Activity className="h-3 w-3" />
                       <span className="truncate">{i.permissions.length} permissions</span>
                     </div>
+                    {callCounts[i.id] && (
+                      <div className="flex items-center gap-2 text-[11px] text-ink-400">
+                        <ExternalLink className="h-3 w-3" />
+                        <span>{callCounts[i.id]} calls today</span>
+                      </div>
+                    )}
                   </div>
 
                   {i.recent.length > 0 && (
@@ -205,6 +212,14 @@ export default function Integrations() {
           </motion.div>
         ))}
       </div>
+
+      {filtered.length === 0 && (
+        <GlassCard className="py-12 text-center" tilt={false}>
+          <Search className="h-12 w-12 text-ink-500 mx-auto mb-3" />
+          <h3 className="text-[16px] font-medium text-white">No integrations found</h3>
+          <p className="mt-1 text-ink-400">Try adjusting your search or filter.</p>
+        </GlassCard>
+      )}
     </div>
   );
 }

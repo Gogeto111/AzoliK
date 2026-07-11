@@ -11,6 +11,15 @@ type BadgeTone =
   | "rose"
   | "muted";
 
+type BadgeSize = "xs" | "sm" | "md" | "lg";
+
+const sizeMap: Record<BadgeSize, string> = {
+  xs: "px-1.5 py-0 text-[10px]",
+  sm: "px-2 py-0.5 text-[11px]",
+  md: "px-2.5 py-0.5 text-[11px]",
+  lg: "px-3 py-1 text-[12px]",
+};
+
 const toneMap: Record<BadgeTone, string> = {
   default: "bg-white/[0.06] text-ink-100 border-white/10",
   muted:   "bg-white/[0.04] text-ink-300 border-white/[0.07]",
@@ -53,12 +62,14 @@ function dotShadow(tone: BadgeTone) {
 
 export function Badge({
   tone = "default",
+  size = "sm",
   className,
   children,
   dot,
   pulse,
 }: {
   tone?: BadgeTone;
+  size?: BadgeSize;
   className?: string;
   children: React.ReactNode;
   dot?: boolean;
@@ -70,6 +81,7 @@ export function Badge({
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium tracking-[0.01em]",
         "backdrop-blur-sm",
         toneMap[tone],
+        sizeMap[size],
         className
       )}
     >
