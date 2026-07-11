@@ -1,5 +1,6 @@
-// OnboardingPage - Main orchestrator for the complete onboarding flow
-import { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, 
@@ -8,26 +9,7 @@ import {
   Shield, 
   Brain, 
   Users, 
-  Briefcase, 
-  BarChart3, 
-  CreditCard, 
-  Wrench,
-  MessageSquare,
-  ShoppingBag,
-  Factory,
-  HeartPulse,
-  GraduationCap,
-  Truck,
-  Building2,
-  Scale,
-  Loader2,
-  Check,
-  ChevronRight,
-  MinusCircle,
-  PlusCircle,
-  Brain as BrainIcon,
   Zap as ZapIcon,
-  Shield as ShieldIcon,
   FileText,
   Link2,
   Cpu,
@@ -36,52 +18,77 @@ import { LandingPage } from "./LandingPage";
 import { AuthPage } from "./AuthPage";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { DiscoveryStep, ReviewStep, KnowledgeStep, IntegrationsStep, DepartmentsStep, TrainingStep } from "@/components/onboarding/OnboardingSteps";
+import { WelcomeScreen } from "@/components/onboarding/screens/WelcomeScreen";
+import { BusinessInfoScreen } from "@/components/onboarding/screens/BusinessInfoScreen";
+import { AIDiscoveryScreen } from "@/components/onboarding/screens/AIDiscoveryScreen";
+import { KnowledgeScreen } from "@/components/onboarding/screens/KnowledgeScreen";
+import { IntegrationsScreen } from "@/components/onboarding/screens/IntegrationsScreen";
+import { DepartmentsScreen } from "@/components/onboarding/screens/DepartmentsScreen";
+import { LaunchScreen } from "@/components/onboarding/screens/LaunchScreen";
 
 const ONBOARDING_STEPS = [
-  { id: "landing", label: "Welcome", icon: Sparkles },
+  { id: "welcome", label: "Welcome", icon: Sparkles },
   { id: "auth", label: "Sign In", icon: Shield },
-  { id: "discovery", label: "Discover", icon: Brain },
-  { id: "review", label: "Review", icon: CheckCircle2 },
-  { id: "knowledge", label: "Knowledge", icon: Sparkles },
-  { id: "integrations", label: "Connect", icon: Zap },
+  { id: "business", label: "Business", icon: Brain },
+  { id: "discovery", label: "Discover", icon: Zap },
+  { id: "knowledge", label: "Knowledge", icon: FileText },
+  { id: "integrations", label: "Connect", icon: Link2 },
   { id: "departments", label: "Departments", icon: Users },
-  { id: "training", label: "Train", icon: Zap },
+  { id: "launch", label: "Launch", icon: Cpu },
 ];
 
 export function OnboardingPage() {
   const { user, profile } = useAuth();
-  const [currentStep, setCurrentStep] = useState<string>("landing");
+  const [currentStep, setCurrentStep] = useState<string>("welcome");
+  const [onboardingData, setOnboardingData] = useState<Record<string, any>>({});
 
   // Auto-advance if user already exists
   useEffect(() => {
-    if (user && currentStep === "landing") {
+    if (user && currentStep === "welcome") {
       setCurrentStep("auth");
     }
   }, [user, currentStep]);
 
-  // Determine which step to render
+  const handleStepComplete = useCallback((stepId: string, data?: any) => {
+    if (data) {
+      setOnboardingData(prev => ({ ...prev, [stepId]: data }));
+    }
+    
+    const currentIndex = ONBOARDING_STEPS.findIndex(s => s.id === stepId);
+    const nextStep = ONBOARDING_STEPS[currentIndex + 1];
+    if (nextStep) {
+      setCurrentStep(nextStep.id);
+    }
+  }, []);
+
+  const handleStepBack = useCallback((stepId: string) => {
+    const currentIndex = ONBOARDING_STEPS.findIndex(s => s.id === stepId);
+    const prevStep = ONBOARDING_STEPS[currentIndex - 1];
+    if (prevStep) {
+      setCurrentStep(prevStep.id);
+    }
+  }, []);
+
   const renderStep = () => {
     switch (currentStep) {
-      case "landing":
-        return <LandingPage onGetStarted={() => setCurrentStep("auth")} />;
+      case "welcome":
+        return <WelcomeScreen onContinue={() => setCurrentStep("auth")} />;
       case "auth":
-        return <AuthPage onComplete={() => setCurrentStep("discovery")} />;
+        return <AuthPage onComplete={() => setCurrentStep("business")} />;
+      case "business":
+        return <BusinessInfoScreen onComplete={() => setCurrentStep("discovery")} onBack={() => setCurrentStep("auth")} />;
       case "discovery":
-        return <DiscoveryStep onComplete={() => setCurrentStep("review")} onBack={() => setCurrentStep("auth")} />;
-      case "review":
-        return <ReviewStep onComplete={() => setCurrentStep("knowledge")} onBack={() => setCurrentStep("discovery")} />;
+        return <AIDiscoveryScreen onComplete={(data) => handleStepComplete("discovery", data)} onBack={() => setCurrentStep("business")} />;
       case "knowledge":
-        return <KnowledgeStep onComplete={() => setCurrentStep("integrations")} onBack={() => setCurrentStep("review")} />;
+        return <KnowledgeScreen onComplete={(data) => handleStepComplete("knowledge", data)} onBack={() => setCurrentStep("discovery")} />;
       case "integrations":
-        return <IntegrationsStep onComplete={() => setCurrentStep("departments")} onBack={() => setCurrentStep("knowledge")} />;
+        return <IntegrationsScreen onComplete={(data) => handleStepComplete("integrations", data)} onBack={() => setCurrentStep("knowledge")} />;
       case "departments":
-        return <DepartmentsStep onComplete={() => setCurrentStep("training")} onBack={() => setCurrentStep("integrations")} />;
-      case "training":
-        return <TrainingStep onComplete={() => setCurrentStep("complete")} onBack={() => setCurrentStep("departments")} />;
+        return <DepartmentsScreen onComplete={(data) => handleStepComplete("departments", data)} onBack={() => setCurrentStep("integrations")} />;
+      case "launch":
+        return <LaunchScreen onComplete={() => setCurrentStep("complete")} />;
       case "complete":
         return (
           <motion.div
@@ -112,7 +119,7 @@ export function OnboardingPage() {
                   <CheckCircle2 className="h-5 w-5" />
                   Go to Dashboard
                 </Button>
-                <Button variant="ghost" onClick={() => setCurrentStep("landing")} className="w-full">
+                <Button variant="ghost" onClick={() => setCurrentStep("welcome")} className="w-full">
                   Back to Home
                 </Button>
               </div>
@@ -120,11 +127,11 @@ export function OnboardingPage() {
           </motion.div>
         );
       default:
-        return <LandingPage onGetStarted={() => setCurrentStep("auth")} />;
+        return <WelcomeScreen onContinue={() => setCurrentStep("auth")} />;
     }
-    };
+  };
 
-    return (
+  return (
     <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950">
       {/* Progress Header */}
       <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-ink-900 border-b border-white/5">
@@ -156,7 +163,7 @@ export function OnboardingPage() {
             <div className="flex items-center justify-between">
               {ONBOARDING_STEPS.map((step, index) => {
                 const isActive = currentStep === step.id;
-                const isCompleted = ["landing", "auth", "discovery", "review", "knowledge", "integrations", "departments", "training"].indexOf(step.id) < ["landing", "auth", "discovery", "review", "knowledge", "integrations", "departments", "training"].indexOf(currentStep);
+                const isCompleted = ONBOARDING_STEPS.findIndex(s => s.id === currentStep) > index;
                 
                 return (
                   <div key={step.id} className="flex flex-col items-center gap-1">
@@ -166,7 +173,7 @@ export function OnboardingPage() {
                       transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 22 }}
                       className={cn(
                         "flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-inset ring-white/15 transition-all",
-                        currentStep === step.id && "bg-brand-500/30 ring-brand-500/30",
+                        isActive && "bg-brand-500/30 ring-brand-500/30",
                         isCompleted && "bg-emerald-500/20 ring-emerald-500/30",
                         !isActive && !isCompleted && "bg-white/[0.02] ring-white/5"
                       )}
@@ -198,7 +205,9 @@ export function OnboardingPage() {
         </div>
 
         <div className="flex-1">
-          {renderStep()}
+          <AnimatePresence mode="wait">
+            {renderStep()}
+          </AnimatePresence>
         </div>
       </div>
     </div>
