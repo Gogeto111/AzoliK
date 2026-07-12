@@ -328,9 +328,11 @@ export function DemoOverlay({ onComplete, onDismiss }: DemoOverlayProps) {
                         className={`relative rounded-xl border p-4 transition-all duration-500 ${
                           dept.active
                             ? "border-white/20 bg-white/[0.06]"
-                            : dept.done
-                              ? "border-emerald-500/30 bg-emerald-500/10"
-                              : "border-white/[0.06] bg-white/[0.02]"
+                            : dept.handoff
+                              ? "border-cyan-500/40 bg-cyan-500/10"
+                              : dept.done
+                                ? "border-emerald-500/30 bg-emerald-500/10"
+                                : "border-white/[0.06] bg-white/[0.02]"
                         }`}
                       >
                         <div className="flex items-center gap-3">
