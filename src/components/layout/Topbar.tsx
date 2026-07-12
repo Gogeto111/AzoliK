@@ -6,9 +6,23 @@ import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { useAI } from "@/lib/aiStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEngine } from "@/lib/engine";
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 export function Topbar() {
   const ai = useAI();
+  const { profile } = useAuth();
+  const engine = useEngine();
+  const userName = profile?.displayName?.split(" ")[0] || "there";
+  const agentsWorking = engine.metrics.agentsWorking || 0;
+
   return (
     <motion.header
       initial={{ y: -10, opacity: 0 }}
@@ -24,10 +38,10 @@ export function Topbar() {
           className="flex items-center gap-3"
         >
           <h1 className="text-[20px] font-semibold tracking-[-0.025em] text-gradient-brand">
-            Good morning, Alex
+            {getGreeting()}, {userName}
           </h1>
           <Badge tone="emerald" dot pulse className="h-[18px]">
-            44 agents active
+            {agentsWorking} agents active
           </Badge>
           {ai.thinking && (
             <motion.div
@@ -119,7 +133,7 @@ export function Topbar() {
           className="ml-1"
           onClick={() => ai.dispatch({ type: "TOGGLE_COPILOT" })}
         >
-          <Avatar name="Alex Morgan" tone="brand" size="md" status="online" />
+          <Avatar name={profile?.displayName || "User"} tone="brand" size="md" status="online" />
         </motion.button>
       </div>
     </motion.header>

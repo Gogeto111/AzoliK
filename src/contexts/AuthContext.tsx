@@ -30,6 +30,7 @@ import {
   createDepartment,
   createDefaultUserProfile,
   updateUserLastLogin,
+  updateBusiness as updateBusinessDoc,
 } from "@/lib/firebase";
 
 interface AuthContextType {
@@ -45,6 +46,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  updateBusiness: (data: Partial<BusinessProfile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
   completeOnboarding: (data: OnboardingData) => Promise<BusinessProfile>;
 }
@@ -210,6 +212,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateBusiness = async (data: Partial<BusinessProfile>) => {
+    if (!business) throw new Error("No business found");
+    try {
+      await updateBusinessDoc(business.id, data);
+      setBusiness(prev => prev ? { ...prev, ...data } : null);
+    } catch (error) {
+      console.error("Update business error:", error);
+      throw error;
+    }
+  };
+
   const completeOnboarding = async (data: OnboardingData): Promise<BusinessProfile> => {
     if (!user || !profile) throw new Error("No user logged in");
 
@@ -235,6 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resetPassword,
       logout,
       updateProfile,
+      updateBusiness,
       refreshProfile,
       completeOnboarding,
     }}>

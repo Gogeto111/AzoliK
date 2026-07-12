@@ -109,7 +109,6 @@ export function TrainingScreen({ departments, onComplete, onBack }: TrainingScre
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs text-ink-400">Step 9 of 10</p>
             <p className="text-xs text-ink-500">{Math.round(globalProgress)}% complete</p>
           </div>
         </header>

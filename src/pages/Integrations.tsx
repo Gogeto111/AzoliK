@@ -9,11 +9,11 @@ import {
   MessageCircle, Mail, Table, CalendarDays, ShoppingBag, ShoppingCart,
   CreditCard, FileText, Target, Grid3X3, Briefcase,
   CheckCircle2, Settings2, Activity, RefreshCw, Clock, Link2,
-  Plus, Search, Wifi, WifiOff, AlertTriangle, ExternalLink,
+  Plus, Search, Wifi, WifiOff, AlertTriangle, ExternalLink, Loader2, Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { db, doc, getDoc } from "@/lib/firebase";
+import { db, doc, getDoc, updateDoc } from "@/lib/firebase";
 
 interface IntegrationConfig {
   connected: boolean;
@@ -63,6 +63,19 @@ const CATEGORIES = [
   { id: "crm", name: "CRM" },
 ];
 
+interface OAuthIntegration {
+  id: string;
+  name: string;
+  requiresOAuth: boolean;
+  scopes?: string[];
+}
+
+const OAUTH_INTEGRATIONS: OAuthIntegration[] = [
+  { id: "gmail", name: "Gmail", requiresOAuth: true, scopes: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"] },
+  { id: "sheets", name: "Google Sheets", requiresOAuth: true, scopes: ["https://www.googleapis.com/auth/spreadsheets"] },
+  { id: "calendar", name: "Google Calendar", requiresOAuth: true, scopes: ["https://www.googleapis.com/auth/calendar"] },
+];
+
 const healthMap = {
   healthy: { label: "Healthy", tone: "emerald" as const, icon: Wifi },
   degraded: { label: "Degraded", tone: "amber" as const, icon: AlertTriangle },
@@ -76,6 +89,7 @@ export default function Integrations() {
   const { business, profile } = useAuth();
   const [connectedMap, setConnectedMap] = useState<Record<string, IntegrationConfig>>({});
   const [loading, setLoading] = React.useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (!profile?.businessId) {
@@ -89,6 +103,42 @@ export default function Integrations() {
       setLoading(false);
     })();
   }, [profile?.businessId]);
+
+  const saveIntegration = async (integrationId: string, config: IntegrationConfig) => {
+    if (!profile?.businessId) return;
+    const updated = { ...connectedMap, [integrationId]: config };
+    await updateDoc(doc(db, "businesses", profile.businessId), {
+      integrations: updated,
+      updatedAt: Date.now(),
+    });
+    setConnectedMap(updated);
+  };
+
+  const handleConnect = async (integrationId: string) => {
+    const oauthDef = OAUTH_INTEGRATIONS.find((o) => o.id === integrationId);
+    if (oauthDef?.requiresOAuth) {
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        alert("Google OAuth not configured. Please add VITE_GOOGLE_CLIENT_ID to your environment.");
+        return;
+      }
+      const state = `${integrationId}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const redirectUri = `${window.location.origin}/auth/google/callback`;
+      const scope = (oauthDef.scopes || []).join(" ");
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&access_type=offline&prompt=consent&state=${state}`;
+    } else {
+      setActionLoading(integrationId);
+      await new Promise((r) => setTimeout(r, 800));
+      await saveIntegration(integrationId, { connected: true, last_sync: new Date().toISOString(), status: "connected" });
+      setActionLoading(null);
+    }
+  };
+
+  const handleDisconnect = async (integrationId: string) => {
+    setActionLoading(integrationId);
+    await saveIntegration(integrationId, { connected: false, status: "disconnected" });
+    setActionLoading(null);
+  };
 
   const integrations: Integration[] = AVAILABLE_INTEGRATIONS.map((base) => {
     const config = connectedMap[base.id];
@@ -207,46 +257,43 @@ export default function Integrations() {
                 <div className="text-[14.5px] font-semibold tracking-[-0.01em] text-white">{i.name}</div>
                 <div className="mt-0.5 text-[11.5px] uppercase tracking-wider text-ink-500">{i.category}</div>
                 <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-ink-400">{i.description}</p>
+                {i.connected && i.lastSync !== "—" && (
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-500">
+                    <Clock className="h-3 w-3" />
+                    <span>Last sync {i.lastSync}</span>
+                  </div>
+                )}
               </div>
 
               {i.connected ? (
-                <>
-                  <div className="mt-4 space-y-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
-                    <div className="flex items-center gap-2 text-[11px] text-ink-400">
-                      <Link2 className="h-3 w-3" />
-                      <span className="truncate">{i.account}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] text-ink-400">
-                      <Clock className="h-3 w-3" />
-                      <span>Last sync {i.lastSync}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] text-ink-400">
-                      <Activity className="h-3 w-3" />
-                      <span className="truncate">{i.permissions.length} permissions</span>
-                    </div>
-                  </div>
-
-                  {i.recent.length > 0 && (
-                    <div className="mt-3 space-y-1">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Recent sync</div>
-                      {i.recent.slice(0, 2).map((r, ri) => (
-                        <div key={ri} className="flex items-start gap-1.5 text-[11.5px] text-ink-300">
-                          <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" />
-                          <span className="truncate">{r}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex items-center gap-2">
-                    <Button size="sm" variant="secondary" className="flex-1 gap-1">
-                      <Settings2 className="h-3 w-3" /> Manage
-                    </Button>
-                  </div>
-                </>
+                <div className="mt-4 flex items-center gap-2">
+                  <Button size="sm" variant="secondary" className="flex-1 gap-1">
+                    <Settings2 className="h-3 w-3" /> Manage
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1 text-rose-300 hover:text-rose-100 hover:bg-rose-500/10"
+                    onClick={() => handleDisconnect(i.id)}
+                    disabled={actionLoading === i.id}
+                  >
+                    {actionLoading === i.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Disconnect"}
+                  </Button>
+                </div>
               ) : (
-                <Button size="sm" variant="primary" className="mt-4 w-full gap-1">
-                  <Plus className="h-3 w-3" /> Connect
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="mt-4 w-full gap-1"
+                  onClick={() => handleConnect(i.id)}
+                  disabled={actionLoading === i.id}
+                >
+                  {actionLoading === i.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Plus className="h-3 w-3" />
+                  )}
+                  {actionLoading === i.id ? "Connecting..." : "Connect"}
                 </Button>
               )}
             </GlassCard>

@@ -23,6 +23,7 @@ import { KnowledgeScreen } from "@/components/onboarding/screens/KnowledgeScreen
 import { IntegrationsScreen } from "@/components/onboarding/screens/IntegrationsScreen";
 import { DepartmentsScreen } from "@/components/onboarding/screens/DepartmentsScreen";
 import { LaunchScreen } from "@/components/onboarding/screens/LaunchScreen";
+import { TrainingScreen } from "@/components/onboarding/screens/TrainingScreen";
 import { db, collection, setDoc, doc as firestoreDoc } from "@/lib/firebase";
 import type { OnboardingData } from "@/lib/firebase";
 
@@ -35,7 +36,8 @@ const ONBOARDING_STEPS = [
   { id: "integrations", label: "Connect", icon: Link2 },
   { id: "departments", label: "Departments", icon: Users },
   { id: "knowledge", label: "Knowledge", icon: Brain },
-  { id: "launch", label: "Launch", icon: Cpu },
+  { id: "training", label: "Training", icon: Cpu },
+  { id: "launch", label: "Launch", icon: Zap },
 ];
 
 export function OnboardingPage() {
@@ -144,6 +146,11 @@ export function OnboardingPage() {
         return <DepartmentsScreen onComplete={(data) => handleStepComplete("departments", data)} onBack={() => setCurrentStep("integrations")} />;
       case "knowledge":
         return <KnowledgeScreen onComplete={(data) => handleStepComplete("knowledge", data)} onBack={() => setCurrentStep("departments")} />;
+      case "training":
+        const trainingDepts = onboardingData.departments?.departments
+          || onboardingData.departments
+          || ["support", "sales", "finance"];
+        return <TrainingScreen departments={Array.isArray(trainingDepts) ? trainingDepts : ["support", "sales", "finance"]} onComplete={() => setCurrentStep("launch")} onBack={() => setCurrentStep("knowledge")} />;
       case "launch":
         const selectedDepartments = onboardingData.departments?.departments
           || onboardingData.departments

@@ -8,10 +8,14 @@ import {
   Bot, Activity, Brain, Zap, CheckCircle2, Clock, AlertCircle,
   MessageSquare, TrendingUp, Megaphone, Settings2, Calculator, Users,
   Eye, PauseCircle, PlayCircle, Settings, BarChart2, Wifi, WifiOff,
+  IndianRupee, Target, Timer,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEngine, useEngineStart } from "@/lib/engine";
+import { DEPARTMENTS } from "@/data/departments";
+import type { DepartmentId } from "@/types";
 
 // Helper function to get event icon - returns JSX element directly
 function getEventIconElement(type: string) {
@@ -91,8 +95,13 @@ const AGENT_MESSAGES: Record<string, string[]> = {
   ],
 };
 
+const DEPT_ORDER: DepartmentId[] = ["support", "sales", "marketing", "operations", "finance", "hr"];
+
 export default function AIWorkforce() {
   const { business } = useAuth();
+  useEngineStart();
+  const engine = useEngine();
+  const prefersReduced = useReducedMotion();
 
   if (!business) {
     return (
@@ -113,17 +122,57 @@ export default function AIWorkforce() {
     );
   }
 
+  const deptMap = Object.fromEntries(DEPARTMENTS.map((d) => [d.id, d]));
+  const m = engine.metrics;
+  const hasWorkforce = DEPT_ORDER.some((id) => engine.departmentStatus[id]?.tone !== "idle");
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="AI Workforce"
-        description="Your AI workforce will appear here once departments are configured and work begins."
-        badge={{ label: "Waiting for data", tone: "muted", dot: true }}
+        description={hasWorkforce ? "Your AI departments are active and processing work." : "Departments will appear here once they start processing work."}
+        badge={hasWorkforce ? { label: `${m.agentsWorking} agents online`, tone: "emerald", dot: true, pulse: true } : { label: "Waiting for data", tone: "muted", dot: true }}
       />
-      <GlassCard className="py-16 text-center" tilt={false}>
-        <Brain className="h-12 w-12 text-ink-500 mx-auto mb-3" />
-        <h3 className="text-[16px] font-medium text-white">No active workforce yet</h3>
-        <p className="mt-1 text-ink-400">Departments and agents will appear here once they start processing real work.</p>
+
+      {/* ── Stats Row ──────────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile icon={IndianRupee} label="Revenue Generated" value={`₹${m.revenueGenerated.toLocaleString()}`} delta="+12%" tone="emerald" />
+        <StatTile icon={Target} label="Leads Closed" value={m.leadsClosed} delta="+3" tone="brand" />
+        <StatTile icon={Users} label="Customers Helped" value={m.customersHelped} delta="+8" tone="violet" />
+        <StatTile icon={Timer} label="Hours Saved" value={`${Math.round(m.hoursSaved)}h`} delta="+2.5h" tone="amber" />
+      </div>
+
+      {/* ── Department Live Cards ───────────────────────────────── */}
+      <div className="space-y-4">
+        {DEPT_ORDER.map((id, i) => {
+          const dept = deptMap[id];
+          if (!dept) return null;
+          return (
+            <DepartmentLiveCard
+              key={id}
+              dept={dept}
+              index={i}
+              state={engine}
+              prefersReduced={!!prefersReduced}
+            />
+          );
+        })}
+      </div>
+
+      {/* ── Thought Stream ─────────────────────────────────────── */}
+      <GlassCard noPadding>
+        <div className="p-4 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Brain className="h-4 w-4 text-brand-400" /> Thought Stream
+            </h2>
+            <Badge tone="muted" size="xs">{engine.timeline.length} events</Badge>
+          </div>
+          <p className="text-[11px] text-ink-500 mt-0.5">Live view of department activity</p>
+        </div>
+        <div className="p-4">
+          <ThoughtStream state={engine} />
+        </div>
       </GlassCard>
     </div>
   );
@@ -131,18 +180,18 @@ export default function AIWorkforce() {
 
 function DepartmentLiveCard({ dept, index, state, prefersReduced }: { dept: any; index: number; state: any; prefersReduced: boolean }) {
   const Icon = DEPT_ICONS[dept.id];
+  const deptStatus = state.departmentStatus[dept.id];
+  const isWorking = deptStatus?.tone === "working";
+  const isActive = deptStatus?.tone !== "idle";
+  const completedToday = deptStatus?.completedTasksToday ?? 0;
+  const agents = dept.agents || [];
   const runningTasks = state.activeTasks.filter(
     (t: any) => t.department === dept.id && (t.status === "running" || t.status === "waiting_handoff")
   );
-  const deptStatus = state.departmentStatus[dept.id];
-  const completedToday = deptStatus?.completedTasksToday ?? 0;
-  const isActive = dept.status === "active";
-  const isWorking = runningTasks.length > 0;
-  const agents = dept.agents;
   const activeAgents = agents.filter((a: any) => a.status === "active" || a.status === "busy");
   const messages = AGENT_MESSAGES[dept.id] || AGENT_MESSAGES.support;
-  const currentMessage = messages[Math.floor(Math.random() * messages.length)];
-  const thinkingAgent = activeAgents[Math.floor(Math.random() * Math.max(1, activeAgents.length))];
+  const currentMessage = deptStatus?.line || messages[Math.floor(Math.random() * messages.length)];
+  const thinkingAgent = activeAgents.length > 0 ? activeAgents[Math.floor(Math.random() * activeAgents.length)] : agents[0];
 
   return (
     <motion.div
@@ -377,7 +426,7 @@ function ThoughtStream({ state }: { state: any }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <span className="text-[12.5px] font-medium text-white">{event.title}</span>
-              <span className="text-[10px] text-ink-500">{formatTimeAgo(event.timestamp)}</span>
+              <span className="text-[10px] text-ink-500">{formatTimeAgo(event.at || event.timestamp)}</span>
             </div>
             <p className="mt-0.5 text-[11.5px] text-ink-400 truncate">{event.description}</p>
             <div className="mt-1 flex items-center gap-2 text-[10px] text-ink-500">

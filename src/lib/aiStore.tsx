@@ -1,6 +1,7 @@
 import * as React from "react";
 import { workforceEngine } from "./engine";
 import { DEPARTMENTS } from "@/data/departments";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type LogLevel = "info" | "success" | "warning" | "error" | "reasoning" | "thinking" | "task";
 
@@ -71,6 +72,18 @@ const deptToneMap: Record<string, ActivityItem["deptTone"]> = {
   HR: "brand",
 };
 
+function getInitialMessage(businessName: string, ownerName: string): string {
+  const hour = new Date().getHours();
+  let greeting = "Good morning";
+  if (hour >= 12 && hour < 17) greeting = "Good afternoon";
+  else if (hour >= 17) greeting = "Good evening";
+
+  const firstName = ownerName?.split(" ")[0] || "there";
+  const business = businessName || "your business";
+
+  return `${greeting}, ${firstName}. Your workforce is online across all 6 departments. I'm ready to help coordinate ${business}. What would you like me to work on?`;
+}
+
 const initialState: Omit<AIState, "dispatch"> = {
   thinking: false,
   thinkingText: "",
@@ -79,14 +92,7 @@ const initialState: Omit<AIState, "dispatch"> = {
   activatingDept: null,
   commandOpen: false,
   copilotOpen: false,
-  conversation: [
-    {
-      id: "seed",
-      role: "ai",
-      content: "Good morning, Alex. Your workforce is online across all 6 departments. 44 agents are processing **3,486 tasks** today and have generated **₹48,210** in revenue. What would you like me to coordinate?",
-      at: Date.now(),
-    },
-  ],
+  conversation: [],
   activity: [],
 };
 
@@ -186,48 +192,11 @@ function aiReplyFor(q: string): { reply: string; action?: () => void; steps?: Re
       };
     }
   }
-  if (lc.includes("revenue") || lc.includes("sales") || lc.includes("pipeline")) {
-    return {
-      reply: `Today **₹${workforceEngine.state.metrics.revenueGenerated.toLocaleString("en-IN")}** has been generated (+12% vs yesterday). Pipeline coverage is healthy at 3.8x. Top 3 deals: **Atlas Corp** (₹73L, late-stage), **NorthPeak** (₹51L, contracting), and **Vimble** (₹36L, demo booked). I've nudged Sales to follow up with Vimble.`,
-      steps: [
-        { label: "Pulling pipeline from CRM", status: "done" },
-        { label: "Calculating today's revenue", status: "done" },
-        { label: "Prioritizing top deals", status: "done" },
-        { label: "Queuing follow-up", status: "done" },
-      ],
-    };
-  }
   if (lc.includes("order") || lc.includes("buy") || lc.includes("stock") || lc.includes("available")) {
     workforceEngine.runOrderFlow();
     return {
       reply: `On it. I've handed this to your **Support** team — they're checking availability now and will loop in Sales (payment link), Operations (reservation) and Finance (invoice) automatically. Watch the Inbox and Live Execution panels for every step.`,
       steps: stepsForIntent("order"),
-    };
-  }
-  if (lc.includes("support") || lc.includes("ticket") || lc.includes("customer")) {
-    return {
-      reply: `Support has handled **${DEPARTMENTS[0].stats.tasksToday.toLocaleString()} tickets today** with a **98% CSAT** and **1.8s average response time**. There are 14 open items, one high-priority escalation is flagged in the activity feed. I've routed it to the Escalation Manager.`,
-      steps: [
-        { label: "Pulling Support metrics", status: "done" },
-        { label: "Identifying escalations", status: "done" },
-        { label: "Flagging priority ticket", status: "done" },
-      ],
-    };
-  }
-  if (lc.includes("attention") || lc.includes("priorit") || lc.includes("need me")) {
-    return {
-      reply: `Here's what needs you today:\n\n1. **Finance** flagged 2 invoices for review (one shows a GST mismatch)\n2. **Marketing** is waiting on your Q3 campaign approval\n3. **Support** has 1 high-priority escalation from a VIP customer\n4. **HR** shortlisted 5 candidates for Sr. Engineer — ready for your review\n\nShall I open the finance review first?`,
-      steps: [
-        { label: "Scanning all 6 departments", status: "done" },
-        { label: "Prioritizing by urgency", status: "done" },
-        { label: "Compiling action list", status: "done" },
-      ],
-    };
-  }
-  if (lc.includes("invoice") || lc.includes("expense") || lc.includes("bill")) {
-    workforceEngine.handleUserRequest("process an invoice");
-    return {
-      reply: `I've handed this to **Finance**. They'll read the bill, categorize it and reconcile it against your ledger.`,
     };
   }
   if (lc.includes("follow up") || lc.includes("lead")) {
@@ -242,31 +211,115 @@ function aiReplyFor(q: string): { reply: string; action?: () => void; steps?: Re
       reply: `**Support** is checking the calendar, **Sales** will confirm the slot and collect deposit, and **Marketing** will queue a reminder. You'll get a notification the moment it's booked.`
     };
   }
-  return {
-    reply: `Understood. I'm routing this across your departments now. Ask me anything specific — check inventory, close a lead, run an invoice, or activate a department — and I'll coordinate the real work for you.`,
-    steps: stepsForIntent("general"),
-  };
+  if (lc.includes("invoice") || lc.includes("expense") || lc.includes("bill")) {
+    workforceEngine.handleUserRequest("process an invoice");
+    return {
+      reply: `I've handed this to **Finance**. They'll read the bill, categorize it and reconcile it against your ledger.`,
+    };
+  }
+  // For all other queries, fall through to OpenAI (handled in AIProvider)
+  return { reply: "", steps: stepsForIntent("general") };
+}
+
+async function callOpenAI(q: string, businessName: string, ownerName: string): Promise<string> {
+  try {
+    const response = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: q,
+        knowledgeContext: [],
+        businessName: businessName || "your business",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.reply || "I couldn't process that. Please try again.";
+  } catch (error) {
+    console.error("OpenAI call failed:", error);
+    return `I understand you're asking about: "${q.slice(0, 100)}". I'm currently coordinating with your departments to handle this. The AI engine is warming up — in the meantime, try asking about orders, appointments, leads, or invoices and I'll coordinate the real work for you.`;
+  }
 }
 
 export function AIProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<Omit<AIState, "dispatch">>(initialState);
   const stateRef = React.useRef(state);
   stateRef.current = state;
+  const { business, profile } = useAuth();
 
   const dispatch = React.useCallback((e: AIEvent) => {
     setState((s) => reducer({ ...s, dispatch: () => {} } as AIState, e));
   }, []);
+
+  // Set initial message dynamically on mount
+  React.useEffect(() => {
+    if (state.conversation.length === 0) {
+      const businessName = business?.name || workforceEngine.state.businessName;
+      const ownerName = profile?.displayName || workforceEngine.state.ownerName;
+      const message = getInitialMessage(businessName, ownerName);
+      dispatch({
+        type: "AI_RESPONSE",
+        content: message,
+      });
+    }
+  }, [business?.name, profile?.displayName, dispatch, state.conversation.length]);
 
   // Simulate AI response when the last message is from the user
   React.useEffect(() => {
     const last = state.conversation[state.conversation.length - 1];
     if (!last || last.role !== "user") return;
     const q = last.content;
+    const localReply = aiReplyFor(q);
+
+    // If we have a local reply (engine flow), use it immediately
+    if (localReply.reply) {
+      const steps = localReply.steps || stepsForIntent(q);
+      dispatch({ type: "THINKING_START", text: "Coordinating across departments…", steps });
+
+      const timers: number[] = [];
+      steps.forEach((_, i) => {
+        timers.push(window.setTimeout(() => {
+          setState((s) => {
+            const next = s.thinkingSteps.map((st, idx) =>
+              idx <= i ? { ...st, status: "done" as const } :
+              idx === i + 1 ? { ...st, status: "thinking" as const } : st
+            );
+            const texts = [
+              "Understanding request…",
+              "Checking relevant departments…",
+              "Calling tools and gathering data…",
+              "Coordinating handoffs…",
+              "Finalizing response…",
+            ];
+            return { ...s, thinkingSteps: next, thinkingText: texts[Math.min(i + 1, texts.length - 1)] };
+          });
+        }, 400 + i * 450));
+      });
+
+      const totalDelay = 1200 + steps.length * 450;
+      timers.push(window.setTimeout(() => {
+        dispatch({ type: "AI_RESPONSE", content: localReply.reply, steps: localReply.steps });
+        localReply.action?.();
+        for (const d of DEPARTMENTS) {
+          if (q.toLowerCase().includes(d.name.toLowerCase()) && (q.toLowerCase().includes("activate") || q.toLowerCase().includes("wake"))) {
+            dispatch({ type: "ACTIVATE_DEPT", dept: d.name });
+            break;
+          }
+        }
+      }, totalDelay));
+
+      return () => timers.forEach((t) => window.clearTimeout(t));
+    }
+
+    // Otherwise, call OpenAI via serverless function
     const steps = stepsForIntent(q);
-    dispatch({ type: "THINKING_START", text: "Coordinating across departments…", steps });
+    dispatch({ type: "THINKING_START", text: "Thinking with AI…", steps });
 
     const timers: number[] = [];
-    // Progress through steps visually
     steps.forEach((_, i) => {
       timers.push(window.setTimeout(() => {
         setState((s) => {
@@ -275,34 +328,27 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
             idx === i + 1 ? { ...st, status: "thinking" as const } : st
           );
           const texts = [
-            "Understanding request…",
-            "Checking relevant departments…",
-            "Calling tools and gathering data…",
-            "Coordinating handoffs…",
-            "Finalizing response…",
+            "Understanding your question…",
+            "Searching knowledge base…",
+            "Reasoning with AI…",
+            "Composing response…",
           ];
           return { ...s, thinkingSteps: next, thinkingText: texts[Math.min(i + 1, texts.length - 1)] };
         });
-      }, 400 + i * 450));
+      }, 300 + i * 400));
     });
 
-    const reply = aiReplyFor(q);
-    const totalDelay = 1200 + steps.length * 450;
+    const businessName = business?.name || workforceEngine.state.businessName;
+    const ownerName = profile?.displayName || workforceEngine.state.ownerName;
 
-    timers.push(window.setTimeout(() => {
-      dispatch({ type: "AI_RESPONSE", content: reply.reply, steps: reply.steps });
-      reply.action?.();
-      // If activating a department, dispatch that event too
-      for (const d of DEPARTMENTS) {
-        if (q.toLowerCase().includes(d.name.toLowerCase()) && (q.toLowerCase().includes("activate") || q.toLowerCase().includes("wake"))) {
-          dispatch({ type: "ACTIVATE_DEPT", dept: d.name });
-          break;
-        }
-      }
-    }, totalDelay));
+    callOpenAI(q, businessName, ownerName).then((reply) => {
+      timers.push(window.setTimeout(() => {
+        dispatch({ type: "AI_RESPONSE", content: reply, steps });
+      }, 800));
+    });
 
     return () => timers.forEach((t) => window.clearTimeout(t));
-  }, [state.conversation.length, dispatch]);
+  }, [state.conversation.length, dispatch, business?.name, profile?.displayName]);
 
   // Sync engine logs into activity
   React.useEffect(() => {

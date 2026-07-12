@@ -28,6 +28,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, collection, query, getDocs } from "@/lib/firebase";
+import { useEngine } from "@/lib/engine";
+import type { DepartmentId } from "@/types";
 
 const STATUS_LABELS: Record<string, { label: string; tone: "emerald" | "amber" | "muted" | "brand"; icon: any }> = {
   active: { label: "Working", tone: "emerald", icon: Activity },
@@ -50,6 +52,7 @@ export default function Departments() {
   const { business } = useAuth();
   const [departments, setDepartments] = React.useState<DeptData[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const engine = useEngine();
 
   React.useEffect(() => {
     if (!business?.id) {
@@ -63,6 +66,17 @@ export default function Departments() {
       setLoading(false);
     })();
   }, [business?.id]);
+
+  // Map engine department status to department data
+  const getEngineDeptStatus = (deptId: string) => {
+    const status = engine.departmentStatus[deptId as DepartmentId];
+    if (!status) return null;
+    return {
+      line: status.line,
+      tone: status.tone,
+      completedTasksToday: status.completedTasksToday,
+    };
+  };
 
   if (!business) {
     return (
@@ -146,9 +160,9 @@ export default function Departments() {
                   <p className="mt-1 text-[13px] text-ink-300">{d.type} department</p>
 
                   <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
-                    <Stat label="Agents" value={String(d.agents)} icon={Bot} />
+                    <Stat label="Agents" value={getEngineDeptStatus(d.type)?.tone === "working" ? "Active" : "Standby"} icon={Bot} />
                     <Stat label="Tools" value={String(d.tools?.length || 0)} icon={Wrench} />
-                    <Stat label="Status" value={d.enabled ? "Online" : "Offline"} icon={Activity} />
+                    <Stat label="Tasks" value={String(getEngineDeptStatus(d.type)?.completedTasksToday || 0)} icon={Activity} />
                   </div>
                 </div>
 

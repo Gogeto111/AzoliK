@@ -5,12 +5,15 @@ import { Sparkles, X, Send, Mic, Zap, Brain, CheckCircle2, Loader2, ChevronRight
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/IconButton";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function AICopilot() {
   const ai = useAI();
   const [input, setInput] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const { profile } = useAuth();
+  const userName = profile?.displayName || "User";
 
   React.useEffect(() => {
     if (scrollRef.current) {
@@ -91,7 +94,7 @@ export function AICopilot() {
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
               {ai.conversation.map((m) => (
-                <MessageBubble key={m.id} message={m} />
+                <MessageBubble key={m.id} message={m} userName={userName} />
               ))}
               <AnimatePresence>
                 {ai.thinking && <ThinkingIndicator key="thinking" text={ai.thinkingText} />}
@@ -190,7 +193,7 @@ export function AICopilot() {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, userName }: { message: Message; userName: string }) {
   const isUser = message.role === "user";
   return (
     <motion.div
@@ -200,7 +203,7 @@ function MessageBubble({ message }: { message: Message }) {
       className={cn("flex gap-2.5", isUser && "flex-row-reverse")}
     >
       {isUser ? (
-        <Avatar name="Alex Morgan" tone="brand" size="sm" />
+        <Avatar name={userName} tone="brand" size="sm" />
       ) : (
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 via-brand-500 to-brand-700 ring-1 ring-inset ring-white/10">
           <Sparkles className="h-[15px] w-[15px] text-white" strokeWidth={2.2} />

@@ -21,21 +21,21 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { cn } from "@/lib/utils";
 
 const DEPARTMENTS = [
-  { name: "Support", icon: MessageSquare, color: "from-cyan-500 to-cyan-700", description: "24/7 customer messages, FAQs, order tracking", agents: 8 },
-  { name: "Sales", icon: Users, color: "from-emerald-500 to-emerald-700", description: "Lead qualification, quotes, follow-ups, payments", agents: 6 },
-  { name: "Marketing", icon: BarChart3, color: "from-violet-500 to-violet-700", description: "Social posts, email campaigns, content creation", agents: 5 },
-  { name: "Finance", icon: Wallet, color: "from-amber-500 to-amber-700", description: "Invoices, expenses, reconciliation, reports", agents: 4 },
-  { name: "Operations", icon: Cpu, color: "from-orange-500 to-orange-700", description: "Inventory, orders, fulfillment, vendors", agents: 6 },
-  { name: "HR", icon: Users, color: "from-rose-500 to-rose-700", description: "Hiring, onboarding, team management", agents: 3 },
+  { name: "Support", icon: MessageSquare, color: "from-cyan-500 to-cyan-700", description: "Never lose a customer while you're asleep. 24/7 replies, FAQs, order tracking.", agents: 8 },
+  { name: "Sales", icon: Users, color: "from-emerald-500 to-emerald-700", description: "Every lead followed up. Every quote sent. Every payment collected.", agents: 6 },
+  { name: "Marketing", icon: BarChart3, color: "from-violet-500 to-violet-700", description: "Posts, campaigns, and content — scheduled and published while you focus on growth.", agents: 5 },
+  { name: "Finance", icon: Wallet, color: "from-amber-500 to-amber-700", description: "Invoices sent. Expenses tracked. Reconciliation done. Zero bookkeeping stress.", agents: 4 },
+  { name: "Operations", icon: Cpu, color: "from-orange-500 to-orange-700", description: "Inventory synced. Orders processed. Fulfillment coordinated — automatically.", agents: 6 },
+  { name: "HR", icon: Users, color: "from-rose-500 to-rose-700", description: "Hiring, onboarding, and team management without the admin overhead.", agents: 3 },
 ];
 
 const FEATURES = [
-  { icon: Bot, title: "44 Specialized AI Agents", desc: "Each department has specialized agents that think, act, and collaborate like a real team." },
-  { icon: Zap, title: "Real Tool Execution", desc: "Agents don't just chat — they call APIs, update sheets, send emails, process payments." },
-  { icon: Shield, title: "Human-in-the-Loop", desc: "You approve, edit, or auto-send. You stay in control without the busywork." },
-  { icon: Globe, title: "Your Tools, Connected", desc: "WhatsApp, Gmail, Sheets, Calendar, Razorpay, Shopify — one click to connect." },
-  { icon: Cpu, title: "Real Business Intelligence", desc: "Agents read your docs, learn your policies, and apply them consistently." },
-  { icon: Clock, title: "Deployed in 5 Minutes", desc: "From sign-up to live AI workforce. No engineers, no prompts, no configuration." },
+  { icon: Clock, title: "Get Your Evenings Back", desc: "Stop answering messages at 11 PM. Your AI team handles customer queries, orders, and follow-ups — day and night." },
+  { icon: Zap, title: "Never Miss a Lead", desc: "Every inquiry gets a response in seconds. Every quote gets followed up. No lead falls through the cracks." },
+  { icon: Shield, title: "You Stay in Control", desc: "Approve, edit, or auto-send. Your AI team works for you — not instead of you." },
+  { icon: Globe, title: "Works Where You Work", desc: "WhatsApp, Gmail, Sheets, Calendar, Razorpay, Shopify — connected in one click." },
+  { icon: Cpu, title: "Learns Your Business", desc: "Your products, prices, policies, FAQs — all loaded in. It knows your business like a 2-year employee." },
+  { icon: Users, title: "5 Minutes to Go Live", desc: "Sign up. Tell us about your business. Your AI workforce starts working. No engineers needed." },
 ];
 
 export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {

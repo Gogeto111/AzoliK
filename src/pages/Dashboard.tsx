@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, collection, query, where, orderBy, limit as fsLimit, getDocs } from "@/lib/firebase";
 import type { BusinessProfile, Department, Task, Conversation } from "@/lib/firebase";
@@ -7,6 +8,7 @@ import { DEPARTMENTS } from "@/data/departments";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { softSpring, snappySpring, durations, ease } from "@/lib/motion";
 import {
   Loader2,
   Check,
@@ -263,6 +265,26 @@ export function useDashboardData(): DashboardData {
   return data;
 }
 
+/* ── animation variants ──────────────────────────────────────── */
+
+const pageVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+  },
+};
+
+const itemVariant = {
+  hidden: { opacity: 0, y: 16, filter: "blur(6px)" },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: snappySpring,
+  },
+};
+
 /* ── Mission Control Dashboard ────────────────────────────────── */
 
 export default function Dashboard() {
@@ -309,9 +331,17 @@ export default function Dashboard() {
   const m = engine.metrics;
 
   return (
-    <div className="space-y-6 pb-4">
+    <motion.div
+      className="space-y-6 pb-4"
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {/* ── Header ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <motion.div
+        variants={itemVariant}
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+      >
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight text-white">
             Mission Control
@@ -334,10 +364,10 @@ export default function Dashboard() {
             departments
           </Badge>
         </div>
-      </div>
+      </motion.div>
 
       {/* ── KPI Strip ─────────────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <motion.div variants={itemVariant} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {(
           [
             {
@@ -397,10 +427,10 @@ export default function Dashboard() {
             </GlassCard>
           );
         })}
-      </div>
+      </motion.div>
 
       {/* ── Department Status Grid ────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <motion.div variants={itemVariant} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {DEPT_ORDER.map((id) => {
           const dept = deptConfigMap[id];
           const status = engine.departmentStatus[id];
@@ -455,10 +485,10 @@ export default function Dashboard() {
             </GlassCard>
           );
         })}
-      </div>
+      </motion.div>
 
       {/* ── Live Execution + Tool Calls ───────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-5">
+      <motion.div variants={itemVariant} className="grid gap-4 lg:grid-cols-5">
         {/* Live Execution Panel */}
         <GlassCard className="lg:col-span-2" noPadding>
           <div className="p-4 border-b border-white/[0.06]">
@@ -616,11 +646,11 @@ export default function Dashboard() {
             )}
           </div>
         </GlassCard>
-      </div>
+      </motion.div>
 
       {/* ── Attention Items ───────────────────────────────────── */}
       {engine.attention.length > 0 && (
-        <div className="space-y-3">
+        <motion.div variants={itemVariant} className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-white">
               Needs Attention
@@ -669,12 +699,12 @@ export default function Dashboard() {
               </GlassCard>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* ── Recent Inbox (from Firestore) ──────────────────────── */}
       {supabase.inbox.length > 0 && (
-        <div className="space-y-3">
+        <motion.div variants={itemVariant} className="space-y-3">
           <h2 className="text-sm font-semibold text-white">Open Conversations</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {supabase.inbox.slice(0, 4).map((conv: any) => (
@@ -698,8 +728,8 @@ export default function Dashboard() {
               </GlassCard>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }

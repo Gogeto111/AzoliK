@@ -124,14 +124,14 @@ const TIMEZONES: Timezone[] = [
 export default function Settings() {
   const [active, setActive] = useState<string>("profile");
   const [saving, setSaving] = useState(false);
-  const { profile: authProfile, business: authBusiness } = useAuth();
+  const { profile: authProfile, business: authBusiness, updateProfile, updateBusiness } = useAuth();
 
   // Profile form state - initialized from auth data
   const [profile, setProfile] = useState({
     firstName: authProfile?.displayName?.split(" ")[0] || "",
     lastName: authProfile?.displayName?.split(" ").slice(1).join(" ") || "",
     email: authProfile?.email || "",
-    role: authProfile?.role || "Owner",
+    role: (authProfile?.role as "owner" | "admin" | "manager" | "employee") || "owner",
     phone: authProfile?.phoneNumber || "",
     avatar: null as string | null,
   });
@@ -256,8 +256,31 @@ export default function Settings() {
 
   const handleSave = async (section: string) => {
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setSaving(false);
+    try {
+      if (section === "profile") {
+        await updateProfile({
+          displayName: `${profile.firstName} ${profile.lastName}`.trim(),
+          email: profile.email,
+          role: profile.role as "owner" | "admin" | "manager" | "employee",
+          phoneNumber: profile.phone,
+        });
+      } else if (section === "business") {
+        await updateBusiness({
+          name: business.name,
+          type: business.industry,
+          timezone: business.timezone,
+          address: business.address,
+          phone: business.phone,
+          website: business.website,
+          gstin: business.gstin,
+          currency: business.currency,
+        });
+      }
+    } catch (err) {
+      console.error("Settings save error:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

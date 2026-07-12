@@ -118,15 +118,15 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
     }
 
     return analytics.reduce((acc, day) => ({
-      revenueAssisted: acc.revenueAssisted + (day.revenueAssisted ?? day.revenue_assisted ?? 0),
-      customersHelped: acc.customersHelped + (day.customersHelped ?? day.customers_helped ?? 0),
-      appointmentsBooked: acc.appointmentsBooked + (day.appointmentsBooked ?? day.appointments_booked ?? 0),
-      ordersClosed: acc.ordersClosed + (day.ordersClosed ?? day.orders_closed ?? 0),
-      hoursSaved: acc.hoursSaved + (day.hoursSaved ?? day.hours_saved ?? 0),
-      messagesAnswered: acc.messagesAnswered + (day.messagesAnswered ?? day.messages_answered ?? 0),
-      avgResponseTime: acc.avgResponseTime + (day.avgResponseTime ?? day.avg_response_time ?? 0),
-      successRate: acc.successRate + (day.successRate ?? day.success_rate ?? 0),
-      automationsCompleted: acc.automationsCompleted + (day.automationsCompleted ?? day.automations_completed ?? 0),
+      revenueAssisted: acc.revenueAssisted + (day.revenueAssisted ?? 0),
+      customersHelped: acc.customersHelped + (day.customersHelped ?? 0),
+      appointmentsBooked: acc.appointmentsBooked + (day.appointmentsBooked ?? 0),
+      ordersClosed: acc.ordersClosed + (day.ordersClosed ?? 0),
+      hoursSaved: acc.hoursSaved + (day.hoursSaved ?? 0),
+      messagesAnswered: acc.messagesAnswered + (day.messagesAnswered ?? 0),
+      avgResponseTime: acc.avgResponseTime + (day.avgResponseTime ?? 0),
+      successRate: acc.successRate + (day.successRate ?? 0),
+      automationsCompleted: acc.automationsCompleted + (day.automationsCompleted ?? 0),
     }), {
       revenueAssisted: 0,
       customersHelped: 0,
@@ -168,7 +168,7 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
   const departmentStats = useMemo(() => {
     if (!analytics.length) return {};
     const latest = analytics[analytics.length - 1];
-    return latest.departmentStats ?? latest.department_stats ?? {};
+    return latest.departmentStats ?? {};
   }, [analytics]);
 
   const formatNumber = (num: number) => {
