@@ -5,7 +5,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   CreditCard,
@@ -36,8 +36,13 @@ import {
   Plus,
   Loader2,
   Copy as CopyIcon,
+  RefreshCw,
+  ExternalLink,
+  Unplug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { sb, IntegrationConfig } from "@/lib/supabase";
 
 interface SettingSection {
   id: string;
@@ -546,23 +551,149 @@ function PermissionsSection({ permissions, setPermissions }: { permissions: any;
   );
 }
 
+interface IntegrationItem {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  icon: typeof Mail;
+  requiresOAuth: boolean;
+  scopes?: string[];
+}
+
+const INTEGRATIONS_LIST: IntegrationItem[] = [
+  { id: "gmail", name: "Gmail", description: "Email automation & inbox management", category: "Communication", icon: Mail, requiresOAuth: true, scopes: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"] },
+  { id: "google_sheets", name: "Google Sheets", description: "Data sync, reports & inventory", category: "Productivity", icon: Mail, requiresOAuth: true, scopes: ["https://www.googleapis.com/auth/spreadsheets"] },
+  { id: "google_calendar", name: "Google Calendar", description: "Appointment scheduling & availability", category: "Productivity", icon: CalendarDays, requiresOAuth: true, scopes: ["https://www.googleapis.com/auth/calendar"] },
+  { id: "whatsapp", name: "WhatsApp Business", description: "Customer messaging & support", category: "Communication", icon: MessageSquare, requiresOAuth: false },
+  { id: "shopify", name: "Shopify", description: "E-commerce orders & inventory", category: "Commerce", icon: Mail, requiresOAuth: false },
+  { id: "razorpay", name: "Razorpay", description: "Payments & invoicing", category: "Commerce", icon: CreditCard, requiresOAuth: false },
+  { id: "hubspot", name: "HubSpot", description: "CRM, contacts & pipelines", category: "CRM", icon: Mail, requiresOAuth: false },
+];
+
 function IntegrationsSection() {
+  const { profile } = useAuth();
+  const [connectedIntegrations, setConnectedIntegrations] = useState<Record<string, IntegrationConfig>>({});
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profile?.business_id) return;
+    (async () => {
+      const { data } = await sb
+        .from("businesses")
+        .select("integrations")
+        .eq("id", profile.business_id)
+        .single();
+      if (data?.integrations) setConnectedIntegrations(data.integrations);
+      setLoading(false);
+    })();
+  }, [profile?.business_id]);
+
+  const saveIntegration = async (integrationId: string, config: IntegrationConfig) => {
+    if (!profile?.business_id) return;
+    const updated = { ...connectedIntegrations, [integrationId]: config };
+    await sb
+      .from("businesses")
+      .update({ integrations: updated, updated_at: new Date().toISOString() })
+      .eq("id", profile.business_id);
+    setConnectedIntegrations(updated);
+  };
+
+  const handleConnect = (item: IntegrationItem) => {
+    if (item.requiresOAuth) {
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      if (!clientId) { alert("Google OAuth not configured. Please add VITE_GOOGLE_CLIENT_ID to your environment."); return; }
+      const state = `${item.id}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const redirectUri = `${window.location.origin}/auth/google/callback`;
+      const scope = (item.scopes || []).join(" ");
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&access_type=offline&prompt=consent&state=${state}`;
+    } else {
+      setActionLoading(item.id);
+      setTimeout(async () => {
+        await saveIntegration(item.id, { connected: true, last_sync: new Date().toISOString(), status: "connected" });
+        setActionLoading(null);
+      }, 800);
+    }
+  };
+
+  const handleDisconnect = async (integrationId: string) => {
+    setActionLoading(integrationId);
+    await saveIntegration(integrationId, { connected: false, status: "disconnected" });
+    setActionLoading(null);
+  };
+
+  const connectedCount = Object.values(connectedIntegrations).filter(i => i?.connected).length;
+
   return (
-    <GlassCard className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-[15px] font-semibold text-white">Connected Integrations</h3>
-          <p className="mt-0.5 text-[12.5px] text-ink-400">Manage your connected tools and permissions.</p>
+    <div className="space-y-5">
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-[15px] font-semibold text-white">Connected Integrations</h3>
+            <p className="mt-0.5 text-[12.5px] text-ink-400">
+              {connectedCount} of {INTEGRATIONS_LIST.length} integrations connected
+            </p>
+          </div>
+          <Button variant="primary" size="sm" onClick={() => window.location.href = "/integrations"}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Connect New Tool
+          </Button>
         </div>
-        <Button variant="primary" size="sm"><Plus className="h-3.5 w-3.5 mr-1" /> Connect New Tool</Button>
-      </div>
-      <p className="text-center text-ink-400 py-8">Integration management will open the Integrations page.</p>
-      <div className="flex justify-center">
-        <Button variant="secondary" onClick={() => window.location.href = "/integrations"}>
-          Go to Integrations
-        </Button>
-      </div>
-    </GlassCard>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 text-brand-300 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {INTEGRATIONS_LIST.map((item) => {
+              const config = connectedIntegrations[item.id];
+              const isConnected = config?.connected === true;
+              const isWorking = actionLoading === item.id;
+              const Icon = item.icon;
+
+              return (
+                <div key={item.id} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/10 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-inset ring-white/10", isConnected ? "bg-emerald-500/15" : "bg-white/[0.04]")}>
+                      <Icon className={cn("h-5 w-5", isConnected ? "text-emerald-300" : "text-ink-400")} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] font-medium text-white">{item.name}</span>
+                        {isConnected && <Badge tone="emerald" size="xs" dot>Connected</Badge>}
+                        {!isConnected && <Badge tone="default" size="xs">Disconnected</Badge>}
+                      </div>
+                      <div className="text-[12px] text-ink-400 mt-0.5">{item.description}</div>
+                      {isConnected && config?.last_sync && (
+                        <div className="text-[11px] text-ink-500 mt-1">
+                          Last synced {new Date(config.last_sync).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isConnected ? (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => handleDisconnect(item.id)} disabled={isWorking} className="text-rose-300 hover:text-rose-100">
+                          {isWorking ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Unplug className="h-3.5 w-3.5 mr-1" />}
+                          Disconnect
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="secondary" onClick={() => handleConnect(item)} disabled={isWorking}>
+                        {isWorking ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : item.requiresOAuth ? <ExternalLink className="h-3.5 w-3.5 mr-1" /> : <Zap className="h-3.5 w-3.5 mr-1" />}
+                        Connect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </GlassCard>
+    </div>
   );
 }
 

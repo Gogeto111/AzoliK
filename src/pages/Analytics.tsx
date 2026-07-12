@@ -1,409 +1,587 @@
-import * as React from "react";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { useEngine, workforceEngine, DEPARTMENTS } from "@/lib/engine";
-import { Download, TrendingUp, Users, Clock, DollarSign, Bot, Zap, CheckCircle2, Target, BarChart2, TrendingDown, Shield, Award, TrendingUp as TrendingUpIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  LineChart, Line, AreaChart, Area,
+import { 
+  TrendingUp, Users, Clock, Target, ShoppingBag, DollarSign, 
+  Activity, BarChart3, LineChart, PieChart, ArrowUpRight, 
+  ArrowDownRight, Minus, Calendar, Filter, Download, RefreshCw,
+  Building2, MessageSquare, Briefcase, CreditCard, Settings, Zap
+} from "lucide-react";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { useAuth } from "@/contexts/AuthContext";
+import { sb, AnalyticsData, Department } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
+import { 
+  LineChart as LineChartComp, 
+  Line, 
+  AreaChart, 
+  Area, 
+  BarChart as BarChartComp, 
+  Bar, 
+  PieChart as PieChartComp, 
+  Pie, 
+  Cell, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  ComposedChart,
 } from "recharts";
 
-const TONE_MAP = {
-  support: "cyan" as const,
-  sales: "emerald" as const,
-  marketing: "violet" as const,
-  operations: "amber" as const,
-  finance: "rose" as const,
-  hr: "brand" as const,
-};
+const COLORS = ["#5f76ff", "#22d3ee", "#f472b6", "#fbbf24", "#34d399", "#a78bfa"];
 
-const BAR_COLORS: Record<string, string> = {
-  support: "#22d3ee",
-  sales: "#34d399",
-  marketing: "#a78bfa",
-  operations: "#fbbf24",
-  finance: "#fb7185",
-  hr: "#8faeff",
-};
+interface AnalyticsPageProps {
+  businessId?: string;
+}
 
-export default function Analytics() {
-  const state = useEngine();
-  const [, force] = React.useReducer((x) => x + 1, 0);
-  React.useEffect(() => {
-    const id = window.setInterval(force, 2000);
-    return () => window.clearInterval(id);
-  }, []);
+export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps) {
+  const { business } = useAuth();
+  const businessId = propBusinessId || business?.id;
+  
+  const [analytics, setAnalytics] = useState<AnalyticsData[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    to: new Date(),
+  });
+  const [loading, setLoading] = useState(true);
+  const [granularity, setGranularity] = useState<"day" | "week" | "month">("day");
 
-  const m = workforceEngine.state.metrics;
-  const toolCalls = workforceEngine.state.toolCalls;
-  const successCalls = toolCalls.filter((t) => t.status === "success").length;
-  const successRate = toolCalls.length === 0 ? 99 : Math.round((successCalls / toolCalls.length) * 100);
+  useEffect(() => {
+    if (businessId) {
+      fetchAnalytics();
+      fetchDepartments();
+    }
+  }, [businessId, dateRange, granularity]);
 
-  const deptWork = React.useMemo(() => {
-    const counts: Record<string, number> = {};
-    DEPARTMENTS.forEach((d) => (counts[d.id] = 0));
-    toolCalls.slice(0, 200).forEach((t) => { counts[t.department] = (counts[t.department] ?? 0) + 1; });
-    return DEPARTMENTS.map((d) => ({
-      id: d.id, name: d.name, value: counts[d.id] ?? 0, color: d.color.primary,
-      tasksToday: d.stats.tasksToday, successRate: d.stats.successRate,
+  const fetchAnalytics = async () => {
+    if (!businessId) return;
+    try {
+      const from = dateRange.from.toISOString().split("T")[0];
+      const to = dateRange.to.toISOString().split("T")[0];
+      
+      const { data, error } = await sb
+        .from("analytics_daily")
+        .select("*")
+        .eq("business_id", businessId)
+        .gte("date", from)
+        .lte("date", to)
+        .order("date", { ascending: true });
+
+      if (!error && data) {
+        setAnalytics(data);
+      }
+    } catch (error) {
+      console.error("Analytics fetch error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    if (!businessId) return;
+    try {
+      const { data, error } = await sb
+        .from("departments")
+        .select("*")
+        .eq("business_id", businessId);
+      
+      if (!error && data) {
+        setDepartments(data);
+      }
+    } catch (error) {
+      console.error("Departments fetch error:", error);
+    }
+  };
+
+  // Aggregate metrics
+  const metrics = useMemo(() => {
+    if (!analytics.length) {
+      return {
+        revenueAssisted: 0,
+        customersHelped: 0,
+        appointmentsBooked: 0,
+        ordersClosed: 0,
+        hoursSaved: 0,
+        messagesAnswered: 0,
+        avgResponseTime: 0,
+        successRate: 0,
+        automationsCompleted: 0,
+      };
+    }
+
+    return analytics.reduce((acc, day) => ({
+      revenueAssisted: acc.revenueAssisted + (day.revenue_assisted || 0),
+      customersHelped: acc.customersHelped + (day.customers_helped || 0),
+      appointmentsBooked: acc.appointmentsBooked + (day.appointments_booked || 0),
+      ordersClosed: acc.ordersClosed + (day.orders_closed || 0),
+      hoursSaved: acc.hoursSaved + (day.hours_saved || 0),
+      messagesAnswered: acc.messagesAnswered + (day.messages_answered || 0),
+      avgResponseTime: acc.avgResponseTime + (day.avg_response_time || 0),
+      successRate: acc.successRate + (day.success_rate || 0),
+      automationsCompleted: acc.automationsCompleted + (day.automations_completed || 0),
+    }), {
+      revenueAssisted: 0,
+      customersHelped: 0,
+      appointmentsBooked: 0,
+      ordersClosed: 0,
+      hoursSaved: 0,
+      messagesAnswered: 0,
+      avgResponseTime: 0,
+      successRate: 0,
+      automationsCompleted: 0,
+    });
+  }, [analytics]);
+
+  // Calculate averages
+  const avgMetrics = useMemo(() => {
+    const count = analytics.length || 1;
+    return {
+      avgResponseTime: metrics.avgResponseTime / count,
+      successRate: metrics.successRate / count,
+    };
+  }, [analytics.length, metrics]);
+
+  // Chart data
+  const chartData = useMemo(() => {
+    return analytics.map(day => ({
+      date: new Date(day.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" }),
+      revenue: day.revenue_assisted || 0,
+      customers: day.customers_helped || 0,
+      appointments: day.appointments_booked || 0,
+      orders: day.orders_closed || 0,
+      hoursSaved: day.hours_saved || 0,
+      messages: day.messages_answered || 0,
+      responseTime: day.avg_response_time || 0,
+      successRate: day.success_rate || 0,
+      automations: day.automations_completed || 0,
     }));
-  }, [toolCalls.length]);
+  }, [analytics]);
 
-  const topAgents = React.useMemo(
-    () =>
-      DEPARTMENTS.flatMap((d) =>
-        d.agents.slice(0, 2).map((a) => ({
-          name: a.name, role: a.role, dept: d.name, deptId: d.id,
-          tasks: a.tasksCompleted, success: a.successRate,
-        }))
-      )
-        .sort((a, b) => b.tasks - a.tasks)
-        .slice(0, 6),
-    []
-  );
-  const maxTasks = topAgents[0]?.tasks ?? 1;
+  const departmentStats = useMemo(() => {
+    if (!analytics.length) return {};
+    const latest = analytics[analytics.length - 1];
+    return latest.department_stats || {};
+  }, [analytics]);
 
-  const metrics = [
-    { label: "Revenue Assisted", icon: DollarSign, color: "emerald" as const, value: m.revenueGenerated, format: (v: number) => `₹${v.toLocaleString("en-IN")}`, delta: "+12% vs yesterday", trend: "up" as const },
-    { label: "Customers Helped", icon: Users, color: "brand" as const, value: m.customersHelped, format: (v: number) => v.toLocaleString(), delta: "+18% this week", trend: "up" as const },
-    { label: "Appointments Booked", icon: Target, color: "violet" as const, value: m.appointmentsBooked, format: (v: number) => v.toLocaleString(), delta: "+22% this month", trend: "up" as const },
-    { label: "Orders Closed", icon: CheckCircle2, color: "amber" as const, value: m.ordersClosed, format: (v: number) => v.toLocaleString(), delta: "+8% this week", trend: "up" as const },
-    { label: "Hours Saved", icon: Clock, color: "cyan" as const, value: Math.round(m.hoursSaved), format: (v: number) => `${v}h`, delta: "~12h / day", trend: "up" as const },
-    { label: "Messages Answered", icon: Bot, color: "rose" as const, value: m.customersHelped * 3, format: (v: number) => v.toLocaleString(), delta: "+24% this week", trend: "up" as const },
-    { label: "Avg Response Time", icon: TrendingDown, color: "violet" as const, value: 1.8, format: (v: number) => `${v.toFixed(1)}s`, delta: "Target < 2s", trend: "up" as const },
-    { label: "Tool Success Rate", icon: CheckCircle2, color: "emerald" as const, value: successRate, format: (v: number) => `${v}%`, delta: `${m.automationsCompleted.toLocaleString("en-IN")} automations`, trend: "up" as const },
+  const formatNumber = (num: number) => {
+    if (num >= 10000000) return `₹${(num / 10000000).toFixed(1)}Cr`;
+    if (num >= 100000) return `₹${(num / 100000).toFixed(1)}L`;
+    if (num >= 1000) return `₹${(num / 1000).toFixed(1)}K`;
+    return num.toLocaleString();
+  };
+
+  const formatHours = (hours: number) => {
+    if (hours >= 24) return `${(hours / 24).toFixed(1)}d`;
+    return `${hours.toFixed(1)}h`;
+  };
+
+  const KPI_CARDS = [
+    { 
+      key: "revenueAssisted", 
+      label: "Revenue Assisted", 
+      value: formatNumber(metrics.revenueAssisted),
+      icon: DollarSign, 
+      color: "text-emerald-300", 
+      bg: "bg-emerald-500/20",
+      trend: "+12%",
+      trendUp: true,
+    },
+    { 
+      key: "customersHelped", 
+      label: "Customers Helped", 
+      value: metrics.customersHelped.toLocaleString(),
+      icon: Users, 
+      color: "text-brand-300", 
+      bg: "bg-brand-500/20",
+      trend: "+18%",
+      trendUp: true,
+    },
+    { 
+      key: "appointmentsBooked", 
+      label: "Appointments Booked", 
+      value: metrics.appointmentsBooked.toLocaleString(),
+      icon: Target, 
+      color: "text-violet-300", 
+      bg: "bg-violet-500/20",
+      trend: "+22%",
+      trendUp: true,
+    },
+    { 
+      key: "ordersClosed", 
+      label: "Orders Closed", 
+      value: metrics.ordersClosed.toLocaleString(),
+      icon: ShoppingBag, 
+      color: "text-amber-300", 
+      bg: "bg-amber-500/20",
+      trend: "+8%",
+      trendUp: true,
+    },
+    { 
+      key: "hoursSaved", 
+      label: "Hours Saved", 
+      value: formatHours(metrics.hoursSaved),
+      icon: Clock, 
+      color: "text-cyan-300", 
+      bg: "bg-cyan-500/20",
+      trend: "~12h/day",
+      trendUp: true,
+    },
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Analytics"
-        description="Real-time reporting across every department, agent, and workflow. Numbers come straight from the executing engine."
-        badge={{ label: "Live data", tone: "emerald", dot: true }}
-        actions={
-          <Button size="md" variant="glass">
-            <Download className="h-4 w-4" /> Export report
-          </Button>
-        }
-      />
+    <div className="space-y-6 pb-4">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 280, damping: 26 }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-[28px] font-semibold tracking-tight text-white">
+              Analytics
+            </h1>
+            <p className="mt-1 text-[13px] text-ink-400">
+              Real-time insights into your AI workforce performance
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={fetchAnalytics} disabled={loading} className="gap-2">
+              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+              Refresh
+            </Button>
+            <Button variant="secondary" size="sm" className="gap-2">
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </Button>
+          </div>
+        </div>
+      </motion.div>
 
       {/* KPI Strip */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 26 }}
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8"
+        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.05 }}
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
       >
-        {metrics.map((metric, i) => (
-          <KPICard key={metric.label} metric={metric} index={i} />
+        {KPI_CARDS.map((kpi, i) => (
+          <motion.div
+            key={kpi.key}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 26, delay: 0.1 + i * 0.03 }}
+          >
+            <GlassCard className="flex items-center gap-4 p-5" tilt={false}>
+              <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-white/10", kpi.bg)}>
+                <kpi.icon className={cn("h-5 w-5", kpi.color)} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[12px] text-ink-400">{kpi.label}</div>
+                <div className="mt-0.5 text-[22px] font-semibold text-white">{kpi.value}</div>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <span className={cn("h-3 w-3", kpi.trendUp ? "text-emerald-300" : "text-rose-300")}>
+                    {kpi.trendUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  </span>
+                  <span className="text-[11px] font-medium text-ink-300">{kpi.trend}</span>
+                </div>
+              </div>
+            </GlassCard>
+          </motion.div>
         ))}
       </motion.div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_420px]">
-        {/* Activity Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05, type: "spring", stiffness: 260, damping: 26 }}
-        >
-          <GlassCard className="p-6" tilt={false}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
-                  <BarChart2 className="h-4 w-4 text-brand-300" />
-                  Activity Overview
-                </h3>
-                <p className="mt-0.5 text-[12.5px] text-ink-400">Revenue, customers, and tasks over the last 7 days</p>
-              </div>
-              <Badge tone="emerald" dot pulse>Live</Badge>
-            </div>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={generateActivityData()} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorCustomers" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8faeff" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#8faeff" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorTasks" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#fbbf24" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis
-                    dataKey="day"
-                    tick={{ fill: "rgba(207,216,255,0.7)", fontSize: 11 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "rgba(207,216,255,0.6)", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                    contentStyle={{
-                      background: "rgba(15,17,26,0.9)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                      color: "white",
-                      backdropFilter: "blur(12px)",
-                    }}
-                    labelStyle={{ color: "rgba(207,216,255,0.9)" }}
-                  />
-                  <Area type="monotone" dataKey="revenue" fill="url(#colorRevenue)" stroke="#34d399" strokeWidth={2} />
-                  <Area type="monotone" dataKey="customers" fill="url(#colorCustomers)" stroke="#8faeff" strokeWidth={2} />
-                  <Area type="monotone" dataKey="tasks" fill="url(#colorTasks)" stroke="#fbbf24" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCard>
-        </motion.div>
-
-        {/* Workforce at a Glance */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08, type: "spring", stiffness: 260, damping: 26 }}
-        >
-          <GlassCard className="p-6" tilt={false}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
-                  <Bot className="h-4 w-4 text-brand-300" />
-                  Workforce at a Glance
-                </h3>
-                <p className="mt-0.5 text-[12.5px] text-ink-400">
-                  {m.agentsWorking} agents processing {m.tasksRunning} active tasks
-                </p>
-              </div>
-              <Badge tone="emerald" dot pulse>Live</Badge>
-            </div>
-
-            <div className="space-y-3">
-              {DEPARTMENTS.map((d) => {
-                const running = workforceEngine.state.activeTasks.some(
-                  (t) => t.department === d.id && (t.status === "running" || t.status === "waiting_handoff")
-                );
-                return (
-                  <div key={d.id} className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br ring-1 ring-inset ring-white/10",
-                        d.color.bg
-                      )}
-                      style={running ? { boxShadow: `0 0 14px ${d.color.glow}` } : undefined}
-                    >
-                      <d.icon className={cn("h-4 w-4", d.color.text)} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between text-[12.5px]">
-                        <span className="font-medium text-white">{d.name}</span>
-                        <span className="tabular-nums text-ink-300">{d.stats.tasksToday.toLocaleString()} today</span>
-                      </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${Math.min(100, d.stats.successRate)}%`, background: d.color.primary }}
-                        />
-                      </div>
-                    </div>
-                    <Badge tone={TONE_MAP[d.id]}>
-                      {running ? "working" : d.status}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          </GlassCard>
-        </motion.div>
-      </div>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        {/* Tool Activity by Department */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, type: "spring", stiffness: 260, damping: 26 }}
-        >
-          <GlassCard className="p-6" tilt={false}>
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
-              <Zap className="h-4 w-4 text-brand-300" />
-              Tool Activity by Department
-            </h3>
-            <p className="mt-0.5 text-[12.5px] text-ink-400">Recent tool calls executed by each team</p>
-            <div className="mt-5 h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deptWork} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fill: "rgba(207,216,255,0.7)", fontSize: 11 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "rgba(207,216,255,0.6)", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                    contentStyle={{
-                      background: "rgba(15,17,26,0.9)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                      color: "white",
-                      backdropFilter: "blur(12px)",
-                    }}
-                    labelStyle={{ color: "rgba(207,216,255,0.9)" }}
-                  />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                    {deptWork.map((d) => (
-                      <Cell key={d.id} fill={d.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCard>
-        </motion.div>
-
-        {/* Top Performing Agents */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, type: "spring", stiffness: 260, damping: 26 }}
-        >
-          <GlassCard className="p-6" tilt={false}>
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
-              <TrendingUpIcon className="h-4 w-4 text-brand-300" />
-              Top Performing Agents
-            </h3>
-            <p className="mt-0.5 text-[12.5px] text-ink-400">Ranked by tasks completed across the workforce</p>
-            <div className="mt-4 space-y-3">
-              {topAgents.map((a, i) => {
-                const dept = DEPARTMENTS.find((d) => d.id === a.deptId)!;
-                const pct = Math.round((a.tasks / maxTasks) * 100);
-                return (
-                  <div key={a.name} className="flex items-center gap-3">
-                    <span className="w-5 text-[12px] font-mono tabular-nums text-ink-500">{String(i + 1).padStart(2, "0")}</span>
-                    <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br text-[10px] font-bold ring-1 ring-inset ring-white/10", dept.color.bg, dept.color.text)}>
-                      {a.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="truncate text-[13px] font-medium text-white">{a.name}</span>
-                        <span className="text-[12px] tabular-nums text-ink-300">{a.tasks.toLocaleString()} tasks · {a.success}%</span>
-                      </div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: dept.color.primary }} />
-                      </div>
-                      <span className="mt-0.5 block truncate text-[10.5px] uppercase tracking-wider text-ink-500">{a.dept} · {a.role}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </GlassCard>
-        </motion.div>
-      </div>
-
-      {/* Summary Cards */}
+      {/* Charts */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, type: "spring", stiffness: 260, damping: 26 }}
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.1 }}
+        className="grid gap-6 lg:grid-cols-[1fr_380px]"
       >
-        <SummaryCard title="Departments Active" value={`${DEPARTMENTS.filter(d => d.status === "active").length}/6`} icon={Shield} color="emerald" desc="All systems operational" />
-        <SummaryCard title="Avg Tool Latency" value={`${1.8}s`} icon={Clock} color="cyan" desc="Under 2s target" />
-        <SummaryCard title="Automation Uptime" value="99.9%" icon={Zap} color="amber" desc="Zero downtime this month" />
-        <SummaryCard title="Data Freshness" value="< 5s" icon={TrendingUpIcon} color="violet" desc="Real-time sync active" />
+        {/* Main Chart */}
+        <GlassCard className="p-6" tilt={false}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
+              <Activity className="h-4 w-4 text-brand-300" />
+              Performance Trends
+            </h3>
+            <div className="flex items-center gap-2">
+              <select
+                value={granularity}
+                onChange={(e) => setGranularity(e.target.value as "day" | "week" | "month")}
+                className="rounded-xl border border-white/10 bg-ink-900/50 px-3 py-1.5 text-[12px] text-white focus:border-brand-400/40 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              >
+                <option value="day">Daily</option>
+                <option value="week">Weekly</option>
+                <option value="month">Monthly</option>
+              </select>
+            </div>
+          </div>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0a" />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#ffffff20" 
+                  fontSize={11} 
+                  tick={{ fill: "#888" }}
+                  axisLine={{ stroke: "#ffffff10" }}
+                />
+                <YAxis 
+                  stroke="#ffffff20" 
+                  fontSize={11} 
+                  tick={{ fill: "#888" }}
+                  axisLine={false}
+                  tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: "#0f0f1a", 
+                    border: "1px solid #ffffff10", 
+                    borderRadius: "12px",
+                    boxShadow: "0 8px 32px -8px rgba(0,0,0,0.6)"
+                  }}
+                  labelStyle={{ color: "#fff", fontWeight: 600 }}
+                  itemStyle={{ fontSize: "12px" }}
+                />
+                <Legend 
+                  wrapperStyle={{ paddingTop: "20px" }}
+                  iconType="circle"
+                />
+                
+                <Line
+                  type="monotone"
+                  dataKey="customers"
+                  name="Customers Helped"
+                  stroke="#5f76ff"
+                  strokeWidth={2}
+                  dot={{ r: 4, strokeWidth: 2 }}
+                  activeDot={{ r: 6, strokeWidth: 2 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  name="Revenue (₹)"
+                  stroke="#22d3ee"
+                  strokeWidth={2}
+                  dot={{ r: 4, strokeWidth: 2 }}
+                  activeDot={{ r: 6, strokeWidth: 2 }}
+                  yAxisId="right"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="hoursSaved"
+                  name="Hours Saved"
+                  stroke="#34d399"
+                  strokeWidth={2}
+                  fill="#34d399"
+                  fillOpacity={0.1}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+
+        {/* Side Panel */}
+        <div className="space-y-4">
+          {/* Department Performance */}
+          <GlassCard className="p-6" tilt={false}>
+            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white mb-4">
+              <Building2 className="h-4 w-4 text-emerald-300" />
+              Departments Active
+            </h3>
+            <div className="space-y-3">
+              {departments.map((dept) => {
+                const stats = departmentStats[dept.type] || { tasks_today: 0, completed_today: 0, success_rate: 0 };
+                const progress = stats.tasks_today > 0 ? (stats.completed_today / stats.tasks_today) * 100 : 0;
+                return (
+                  <motion.div
+                    key={dept.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="relative p-4 rounded-xl transition-all group"
+                    style={{ background: dept.config?.color?.bg || "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-inset ring-white/15", dept.config?.color?.bg)}>
+                          {dept.config?.icon && <dept.config.icon className={cn("h-5 w-5", dept.config.color?.text)} />}
+                        </div>
+                        <div>
+                          <h4 className="text-[14.5px] font-semibold text-white">{dept.name}</h4>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="relative flex h-1.5 w-1.5 items-center justify-center">
+                              {dept.enabled && (
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                              )}
+                              <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", dept.enabled ? "bg-emerald-400" : "bg-ink-500")} />
+                            </span>
+                            <span className="text-[11px] font-medium text-ink-300">{dept.enabled ? "Online" : "Offline"}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {dept.enabled && (
+                        <Badge tone="emerald" dot size="sm" className="gap-1">
+                          <Zap className="h-2.5 w-2.5" /> Active
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11.5px] text-ink-300">{stats.tasks_today} tasks today</span>
+                        <span className="text-[11.5px] font-medium text-white">{stats.completed_today} completed</span>
+                      </div>
+                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                          className="h-full bg-gradient-to-r from-brand-500 to-emerald-400 rounded-full"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-ink-400">
+                        <span>Success rate: {stats.success_rate.toFixed(1)}%</span>
+                        <span>{progress.toFixed(0)}% progress</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+              {departments.length === 0 && (
+                <div className="py-8 text-center text-[12px] italic text-ink-500">
+                  No departments configured yet
+                </div>
+              )}
+            </div>
+          </GlassCard>
+
+          {/* Additional Metrics */}
+          <GlassCard className="p-6" tilt={false}>
+            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white mb-4">
+              <MessageSquare className="h-4 w-4 text-cyan-300" />
+              Communication Metrics
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <MetricCard 
+                label="Messages Answered" 
+                value={metrics.messagesAnswered.toLocaleString()} 
+                icon={MessageSquare}
+                color="text-cyan-300"
+              />
+              <MetricCard 
+                label="Avg Response Time" 
+                value={`${avgMetrics.avgResponseTime.toFixed(1)}s`} 
+                icon={Clock}
+                color="text-amber-300"
+              />
+              <MetricCard 
+                label="Success Rate" 
+                value={`${avgMetrics.successRate.toFixed(1)}%`} 
+                icon={Target}
+                color="text-emerald-300"
+              />
+              <MetricCard 
+                label="Automations" 
+                value={metrics.automationsCompleted.toLocaleString()} 
+                icon={Zap}
+                color="text-violet-300"
+              />
+            </div>
+          </GlassCard>
+        </div>
+      </motion.div>
+
+      {/* Department Deep Dive */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.15 }}
+        className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        {departments.map((dept, i) => (
+          <motion.div
+            key={dept.id}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 26, delay: 0.12 + i * 0.05 }}
+          >
+            <GlassCard className="p-6" tilt={false} interactive={false}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-white/15", dept.config?.color?.bg)}>
+                    {dept.config?.icon && <dept.config.icon className={cn("h-5 w-5", dept.config.color?.text)} />}
+                  </div>
+                  <div>
+                    <h4 className="text-[14.5px] font-semibold text-white">{dept.name}</h4>
+                    <p className="text-[11px] text-ink-400">{dept.description}</p>
+                  </div>
+                </div>
+                {dept.enabled && (
+                  <Badge tone="emerald" dot size="sm">
+                    <Zap className="h-2.5 w-2.5" /> Online
+                  </Badge>
+                )}
+              </div>
+
+              <div className="space-y-3 mb-4">
+                <MetricRow label="Tasks Today" value={departmentStats[dept.type]?.tasks_today || 0} />
+                <MetricRow label="Completed" value={departmentStats[dept.type]?.completed_today || 0} positive />
+                <MetricRow label="Pending" value={(departmentStats[dept.type]?.tasks_today || 0) - (departmentStats[dept.type]?.completed_today || 0)} />
+                <MetricRow label="Avg Response" value={`${(departmentStats[dept.type]?.success_rate || 0).toFixed(1)}s`} />
+                <MetricRow label="Success Rate" value={`${(departmentStats[dept.type]?.success_rate || 0).toFixed(1)}%`} positive />
+              </div>
+
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full justify-center gap-1.5"
+                onClick={() => window.location.href = `/departments/${dept.id}`}
+              >
+                <ArrowUpRight className="h-3.5 w-3.5" />
+                View Details
+              </Button>
+            </GlassCard>
+          </motion.div>
+        ))}
       </motion.div>
     </div>
   );
 }
 
-function KPICard({ metric, index }: { metric: { color: "brand" | "emerald" | "violet" | "amber" | "cyan" | "rose"; icon: any; label: string; value: number; format: (v: number) => string; delta: string; trend: "up" | "down" }; index: number }) {
-  const colorMap: Record<"brand" | "emerald" | "violet" | "amber" | "cyan" | "rose", string> = {
-    brand: "from-brand-500/30 to-brand-700/10 text-brand-200",
-    emerald: "from-emerald-500/30 to-emerald-700/10 text-emerald-200",
-    violet: "from-violet-500/30 to-violet-700/10 text-violet-200",
-    amber: "from-amber-500/30 to-amber-700/10 text-amber-200",
-    cyan: "from-cyan-500/30 to-cyan-700/10 text-cyan-200",
-    rose: "from-rose-500/30 to-rose-700/10 text-rose-200",
-  };
-
+function MetricCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: any; color: string }) {
   return (
-    <GlassCard className="flex items-center gap-4">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-white/10 ${colorMap[metric.color]}`}>
-        <metric.icon className="h-5 w-5" />
+    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className={cn("h-4 w-4", color)} />
+        <span className="text-[11px] text-ink-400">{label}</span>
       </div>
-      <div className="min-w-0">
-        <div className="text-[12px] text-ink-400">{metric.label}</div>
-        <div className="mt-0.5 text-[22px] font-semibold text-white">{metric.format(metric.value)}</div>
-        <div className="mt-1 flex items-center gap-1.5">
-          <TrendingUp className={cn("h-3 w-3", metric.trend === "up" ? "text-emerald-300" : "text-rose-300")} />
-          <span className="text-[11px] font-medium text-ink-300">{metric.delta}</span>
-        </div>
-      </div>
-    </GlassCard>
+      <div className="text-[18px] font-semibold text-white">{value}</div>
+    </div>
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, color, desc }: { title: string; value: string; icon: any; color: "emerald" | "cyan" | "amber" | "violet"; desc: string }) {
-  const colorMap: Record<"emerald" | "cyan" | "amber" | "violet", string> = {
-    emerald: "from-emerald-500/30 to-emerald-700/10 text-emerald-200",
-    cyan: "from-cyan-500/30 to-cyan-700/10 text-cyan-200",
-    amber: "from-amber-500/30 to-amber-700/10 text-amber-200",
-    violet: "from-violet-500/30 to-violet-700/10 text-violet-200",
-  };
-
+function MetricRow({ label, value, positive }: { label: string; value: number | string; positive?: boolean }) {
   return (
-    <GlassCard className="flex items-center gap-4 p-5">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-white/10 ${colorMap[color]}`}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div>
-        <div className="text-[12px] text-ink-400">{title}</div>
-        <div className="mt-0.5 flex items-baseline gap-2">
-          <span className="text-[22px] font-semibold text-white">{value}</span>
-        </div>
-        <div className="mt-1 text-[11px] text-ink-400">{desc}</div>
-      </div>
-    </GlassCard>
+    <div className="flex items-center justify-between text-[12px]">
+      <span className="text-ink-400">{label}</span>
+      <span className={cn("font-medium", positive ? "text-emerald-300" : "text-white")}>{value}</span>
+    </div>
   );
 }
 
-function generateActivityData() {
-  const data = [];
-  const now = new Date();
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const day = d.toLocaleDateString([], { weekday: "short", day: "numeric" });
-    const baseRevenue = 15000 + Math.random() * 8000;
-    const baseCustomers = 80 + Math.random() * 40;
-    const baseTasks = 120 + Math.random() * 60;
-    data.push({
-      day,
-      revenue: Math.round(baseRevenue),
-      customers: Math.round(baseCustomers),
-      tasks: Math.round(baseTasks),
-    });
-  }
-  return data;
+function TrendingDown({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 18l-6-6 6-6" />
+    </svg>
+  );
 }
+
+export default AnalyticsPage;

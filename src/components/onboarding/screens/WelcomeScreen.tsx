@@ -13,7 +13,7 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
-  const { signInWithGoogle, signInWithMicrosoft, loading } = useAuth();
+  const { signInWithGoogle, loading } = useAuth();
   const [showFeatures, setShowFeatures] = useState(false);
 
   useEffect(() => {
@@ -23,11 +23,6 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
 
   const handleGoogleSignIn = async () => {
     await signInWithGoogle();
-    onContinue();
-  };
-
-  const handleMicrosoftSignIn = async () => {
-    await signInWithMicrosoft();
     onContinue();
   };
 
@@ -111,22 +106,13 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
 
             <Button
               size="lg"
-              onClick={handleMicrosoftSignIn}
+              onClick={onContinue}
               disabled={loading}
               variant="ghost"
               className="w-full gap-3 border-white/10 hover:border-brand-500/30 hover:bg-brand-500/10 text-white font-medium py-4 rounded-xl transition-all"
             >
-              <svg className="h-5 w-5" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 14H4V6h16v12z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 16a4 4 0 110-8 4 4 0 010 8zm0-2a2 2 0 100-4 2 2 0 000 4z"
-                />
-              </svg>
-              <span className="text-base">Continue with Microsoft</span>
+              <Mail className="h-5 w-5" />
+              <span className="text-base">Continue with Email</span>
             </Button>
 
             <Button
@@ -135,7 +121,7 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
               className="w-full gap-3 border-white/10 hover:border-white/20 hover:bg-white/5 text-white font-medium py-4 rounded-xl transition-all"
             >
               <Mail className="h-5 w-5" />
-              <span className="text-base">Continue with Email</span>
+              <span className="text-base">Continue with Apple</span>
             </Button>
           </div>
 

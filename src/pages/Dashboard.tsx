@@ -1,558 +1,714 @@
-import * as React from "react";
-import { motion } from "framer-motion";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { sb, type BusinessProfile, type Department, type Task, type Conversation } from "@/lib/supabase";
+import { useEngine, useEngineStart } from "@/lib/engine";
+import { DEPARTMENTS } from "@/data/departments";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { useEngine, workforceEngine, DEPARTMENTS, switchIndustry, INDUSTRIES_META } from "@/lib/engine";
 import {
-  TrendingUp,
-  Users,
+  Loader2,
+  Check,
+  AlertTriangle,
+  Bell,
   Clock,
-  CheckCircle2,
-  Building2,
-  TrendingDown,
-  DollarSign,
-  Activity,
-  Sparkles,
-  Bot,
-  MessageSquare,
-  ShoppingBag,
-  Settings2,
   Zap,
+  Users,
+  IndianRupee,
   Target,
-  Shield,
+  Bot,
+  Wrench,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import type { DepartmentId } from "@/types";
 
-const STATUS_LABELS: Record<string, { label: string; tone: "emerald" | "amber" | "muted" | "brand"; icon: any }> = {
-  active: { label: "Working", tone: "emerald", icon: Activity },
-  training: { label: "Training", tone: "amber", icon: Bot },
-  idle: { label: "On standby", tone: "muted", icon: Shield },
-  paused: { label: "Paused", tone: "muted", icon: Settings2 },
-};
+/* ── helpers ────────────────────────────────────────────────────── */
 
-export default function Dashboard() {
-  const state = useEngine();
-  const industryMeta = INDUSTRIES_META[state.industry];
-  const [, force] = React.useReducer((x) => x + 1, 0);
-  React.useEffect(() => {
-    const id = window.setInterval(force, 2000);
-    return () => window.clearInterval(id);
-  }, []);
+const deptConfigMap = Object.fromEntries(DEPARTMENTS.map((d) => [d.id, d]));
 
-  const activeDeptCount = DEPARTMENTS.filter((d) => d.status === "active").length;
-  const runningTasks = state.activeTasks.filter((t) => t.status === "running" || t.status === "waiting_handoff").length;
+const DEPT_ORDER: DepartmentId[] = [
+  "support",
+  "sales",
+  "marketing",
+  "operations",
+  "finance",
+  "hr",
+];
 
-  const businessHealth = Math.min(99, 70 + activeDeptCount * 4 + Math.min(15, runningTasks * 2));
+function deptBadgeTone(
+  id: DepartmentId
+): "cyan" | "emerald" | "violet" | "rose" | "amber" | "brand" {
+  switch (id) {
+    case "support":
+      return "cyan";
+    case "sales":
+      return "emerald";
+    case "marketing":
+      return "violet";
+    case "finance":
+      return "rose";
+    case "operations":
+      return "amber";
+    case "hr":
+      return "brand";
+  }
+}
 
-  const metrics = {
-    revenueAssisted: state.metrics.revenueGenerated,
-    customersHelped: state.metrics.customersHelped,
-    appointmentsBooked: state.metrics.appointmentsBooked,
-    ordersClosed: state.metrics.ordersClosed,
-    hoursSaved: Math.round(state.metrics.hoursSaved),
+function deptToneBadge(
+  tone: "idle" | "working" | "handoff" | "done"
+): { tone: "cyan" | "amber" | "emerald" | "muted"; label: string } {
+  switch (tone) {
+    case "working":
+      return { tone: "cyan", label: "Working" };
+    case "handoff":
+      return { tone: "amber", label: "Handoff" };
+    case "done":
+      return { tone: "emerald", label: "Done" };
+    default:
+      return { tone: "muted", label: "Idle" };
+  }
+}
+
+function formatTimeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+/* ── Supabase data hook (kept for real business data) ─────────── */
+
+interface DashboardData {
+  business: BusinessProfile | null;
+  departments: Department[];
+  metrics: {
+    revenueAssisted: number;
+    customersHelped: number;
+    appointmentsBooked: number;
+    ordersClosed: number;
+    hoursSaved: number;
   };
+  activeTasks: Task[];
+  attentionItems: any[];
+  timeline: any[];
+  inbox: Conversation[];
+  loading: boolean;
+}
 
-  const departmentStatus = DEPARTMENTS.map((d) => {
-    const deptStatus = state.departmentStatus[d.id];
-    const running = state.activeTasks.filter(
-      (t) => t.department === d.id && (t.status === "running" || t.status === "waiting_handoff")
-    ).length;
-    const waitingApproval = state.attention.filter(
-      (a) => a.department === d.id && a.kind === "approval"
-    ).length;
-    const completedToday = deptStatus.completedTasksToday;
-    const statusInfo = STATUS_LABELS[d.status] || STATUS_LABELS.idle;
-    const StatusIcon = statusInfo.icon;
-
-    let currentJobs: string[] = [];
-    if (running > 0) currentJobs.push(`${running} task${running > 1 ? "s" : ""} in progress`);
-    if (waitingApproval > 0) currentJobs.push(`${waitingApproval} waiting for approval`);
-    if (completedToday > 0) currentJobs.push(`${completedToday} completed today`);
-
-    return { dept: d, statusInfo, StatusIcon, running, waitingApproval, completedToday, currentJobs };
+export function useDashboardData(): DashboardData {
+  const { business, profile } = useAuth();
+  const [data, setData] = useState<DashboardData>({
+    business: null,
+    departments: [],
+    metrics: {
+      revenueAssisted: 0,
+      customersHelped: 0,
+      appointmentsBooked: 0,
+      ordersClosed: 0,
+      hoursSaved: 0,
+    },
+    activeTasks: [],
+    attentionItems: [],
+    timeline: [],
+    inbox: [],
+    loading: true,
   });
 
-  return (
-    <div className="space-y-6 pb-4">
-      {/* CEO Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 26 }}
-      >
+  const fetchData = useCallback(async () => {
+    if (!business?.id) {
+      setData((prev) => ({ ...prev, loading: false }));
+      return;
+    }
+
+    try {
+      const [
+        { data: departments },
+        { data: tasks },
+        { data: conversations },
+        { data: analytics },
+        { data: invoices },
+        { data: leads },
+      ] = await Promise.all([
+        sb
+          .from("departments")
+          .select("*")
+          .eq("business_id", business.id),
+        sb
+          .from("tasks")
+          .select("*")
+          .eq("business_id", business.id)
+          .in("status", ["pending", "in_progress", "waiting_approval"])
+          .order("created_at", { ascending: false })
+          .limit(20),
+        sb
+          .from("conversations")
+          .select("*")
+          .eq("business_id", business.id)
+          .eq("status", "open")
+          .order("last_message_at", { ascending: false })
+          .limit(10),
+        sb
+          .from("analytics_daily")
+          .select("*")
+          .eq("business_id", business.id)
+          .order("date", { ascending: false })
+          .limit(1),
+        sb
+          .from("invoices")
+          .select("total, status")
+          .eq("business_id", business.id),
+        sb
+          .from("leads")
+          .select("id, status")
+          .eq("business_id", business.id),
+      ]);
+
+      const today = new Date().toISOString().split("T")[0];
+      const todayAnalytics =
+        analytics?.find((a: any) => a.date === today) || analytics?.[0];
+
+      const depts = departments || [];
+      const activeTasks = tasks || [];
+      const openConversations = conversations || [];
+
+      const revenueAssisted =
+        invoices?.reduce(
+          (sum: number, inv: any) => sum + (inv.total || 0),
+          0
+        ) || 0;
+      const customersHelped = openConversations.length;
+      const appointmentsBooked = activeTasks.filter(
+        (t: any) => t.metadata?.type === "appointment"
+      ).length;
+      const ordersClosed =
+        invoices?.filter((inv: any) => inv.status === "paid").length || 0;
+      const hoursSaved =
+        todayAnalytics?.hours_saved ||
+        depts.reduce(
+          (sum: number, d: any) =>
+            sum + (d.stats?.completed_today || 0) * 0.25,
+          0
+        );
+
+      const attentionItems = [
+        ...activeTasks
+          .filter((t: any) => t.status === "waiting_approval")
+          .slice(0, 3)
+          .map((t: any) => ({
+            id: t.id,
+            severity: "warn" as const,
+            title: "Approval Needed",
+            detail: t.title,
+            at: new Date(t.created_at).getTime(),
+            kind: "approval",
+          })),
+        ...openConversations
+          .filter((c: any) => c.unread_count > 0)
+          .slice(0, 2)
+          .map((c: any) => ({
+            id: c.id,
+            severity: "info" as const,
+            title: "New Message",
+            detail: `${c.customer_name}: ${c.last_message?.slice(0, 50)}...`,
+            at: new Date(c.last_message_at).getTime(),
+            kind: "message",
+          })),
+      ];
+
+      const timeline = [
+        ...activeTasks.slice(0, 5).map((t: any) => ({
+          id: t.id,
+          type: "tool_call" as const,
+          title: t.title,
+          description: `Task in ${t.department} department`,
+          department: t.department,
+          at: new Date(t.created_at).getTime(),
+          status:
+            t.status === "completed"
+              ? ("success" as const)
+              : ("running" as const),
+        })),
+        ...openConversations.slice(0, 3).map((c: any) => ({
+          id: c.id,
+          type: "inbound" as const,
+          title: `Message from ${c.customer_name}`,
+          description: c.last_message?.slice(0, 100) || "",
+          department: c.department,
+          at: new Date(c.last_message_at).getTime(),
+          status: "info" as const,
+        })),
+      ].sort((a, b) => b.at - a.at);
+
+      setData({
+        business,
+        departments: depts,
+        metrics: {
+          revenueAssisted,
+          customersHelped,
+          appointmentsBooked,
+          ordersClosed,
+          hoursSaved: Math.round(hoursSaved),
+        },
+        activeTasks,
+        attentionItems,
+        timeline: timeline.slice(0, 12),
+        inbox: openConversations,
+        loading: false,
+      });
+    } catch (error) {
+      console.error("Dashboard data fetch error:", error);
+      setData((prev) => ({ ...prev, loading: false }));
+    }
+  }, [business]);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  return data;
+}
+
+/* ── Mission Control Dashboard ────────────────────────────────── */
+
+export default function Dashboard() {
+  useEngineStart();
+  const engine = useEngine();
+  const { business } = useAuth();
+  const supabase = useDashboardData();
+
+  const activeTask = engine.activeTasks[0];
+  const activeToolCalls = activeTask
+    ? engine.toolCalls.filter((tc) => activeTask.toolCalls.includes(tc.id))
+    : [];
+
+  if (supabase.loading) {
+    return (
+      <div className="space-y-6 pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-[28px] font-semibold tracking-tight text-white">
-              Good Morning, {state.ownerName} 👋
+              Loading...
             </h1>
             <p className="mt-1 text-[13px] text-ink-400">
-              {industryMeta?.name} · {industryMeta?.tagline}
+              Booting up Mission Control
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <GlassCard tone="subtle" className="flex items-center gap-2 px-4 py-2" tilt={false}>
-              <span className="relative flex h-1.5 w-1.5 items-center justify-center">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
-              </span>
-              <span className="text-[12px] font-medium text-ink-200">Business Health: {businessHealth}%</span>
-            </GlassCard>
-            <Button variant="ghost" size="sm" className="hidden sm:flex">
-              <Sparkles className="h-3.5 w-3.5" /> Switch Industry
-            </Button>
-          </div>
         </div>
-      </motion.div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center gap-4 p-5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/[0.02] ring-1 ring-inset ring-white/10 animate-pulse">
+                <div className="h-5 w-5 rounded bg-white/10" />
+              </div>
+              <div className="min-w-0">
+                <div className="h-4 bg-white/5 rounded w-3/4 animate-pulse mb-1" />
+                <div className="h-8 bg-white/5 rounded w-1/2 animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-      {/* Today's Results - KPI Strip */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.05 }}
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
-      >
-        <KPICard
-          icon={DollarSign}
-          iconColor="text-emerald-300"
-          label="Revenue Assisted"
-          value={`₹${metrics.revenueAssisted.toLocaleString("en-IN")}`}
-          delta="+12% vs yesterday"
-          trend="up"
-        />
-        <KPICard
-          icon={Users}
-          iconColor="text-brand-300"
-          label="Customers Helped"
-          value={metrics.customersHelped.toLocaleString()}
-          delta="+18% this week"
-          trend="up"
-        />
-        <KPICard
-          icon={Target}
-          iconColor="text-violet-300"
-          label="Appointments Booked"
-          value={metrics.appointmentsBooked.toLocaleString()}
-          delta="+22% this month"
-          trend="up"
-        />
-        <KPICard
-          icon={ShoppingBag}
-          iconColor="text-amber-300"
-          label="Orders Closed"
-          value={metrics.ordersClosed.toLocaleString()}
-          delta="+8% this week"
-          trend="up"
-        />
-        <KPICard
-          icon={Clock}
-          iconColor="text-cyan-300"
-          label="Hours Saved"
-          value={`${metrics.hoursSaved}h`}
-          delta="~12h / day"
-          trend="up"
-        />
-      </motion.div>
+  const m = engine.metrics;
 
-      {/* Today's AI Workforce - Department Status Cards */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.1 }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[17px] font-semibold text-white">Today's AI Workforce</h2>
+  return (
+    <div className="space-y-6 pb-4">
+      {/* ── Header ────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-[28px] font-semibold tracking-tight text-white">
+            Mission Control
+          </h1>
+          <p className="mt-1 text-[13px] text-ink-400">
+            {engine.businessName} — Your AI workforce in action
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge tone="emerald" dot pulse>
-            {activeDeptCount} of {DEPARTMENTS.length} online
+            {m.agentsWorking} agents working
+          </Badge>
+          <Badge tone="cyan" dot={m.tasksRunning > 0}>
+            {m.tasksRunning} tasks running
+          </Badge>
+          <Badge tone="muted">
+            {engine.departmentStatus
+              ? Object.keys(engine.departmentStatus).length
+              : 0}{" "}
+            departments
           </Badge>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {departmentStatus.map(({ dept, statusInfo, StatusIcon, currentJobs, running, waitingApproval, completedToday }) => {
-            const isActive = dept.status === "active";
-            const isWorking = running > 0;
-            return (
-              <motion.div
-                key={dept.id}
-                initial={{ opacity: 0, y: 12, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ type: "spring", stiffness: 260, damping: 26, delay: 0.12 }}
-              >
-                <DepartmentStatusCard
-                  dept={dept}
-                  statusInfo={statusInfo}
-                  StatusIcon={StatusIcon}
-                  isActive={isActive}
-                  isWorking={isWorking}
-                  currentJobs={currentJobs}
-                  running={running}
-                  waitingApproval={waitingApproval}
-                  completedToday={completedToday}
-                />
-              </motion.div>
-            );
-          })}
-        </div>
-      </motion.div>
+      </div>
 
-      {/* Live Activity Feed + Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.15 }}
-        className="grid gap-6 lg:grid-cols-[1fr_380px]"
-      >
-        {/* Activity Feed */}
-        <GlassCard className="p-6" tilt={false}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
-              <Activity className="h-4 w-4 text-brand-300" />
-              Live Activity
-            </h3>
-            <Badge tone="emerald" dot pulse>Live</Badge>
+      {/* ── KPI Strip ─────────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {(
+          [
+            {
+              label: "Revenue Generated",
+              value: `₹${m.revenueGenerated.toLocaleString()}`,
+              icon: IndianRupee,
+              fallback: supabase.metrics.revenueAssisted,
+              prefix: "₹",
+            },
+            {
+              label: "Leads Closed",
+              value: m.leadsClosed.toLocaleString(),
+              icon: Target,
+            },
+            {
+              label: "Customers Helped",
+              value: m.customersHelped.toLocaleString(),
+              icon: Users,
+              fallback: supabase.metrics.customersHelped,
+            },
+            {
+              label: "Hours Saved",
+              value: `${Math.round(m.hoursSaved)}h`,
+              icon: Clock,
+              fallback: supabase.metrics.hoursSaved,
+            },
+            {
+              label: "Automations",
+              value: m.automationsCompleted.toLocaleString(),
+              icon: Zap,
+            },
+          ] as const
+        ).map((kpi, i) => {
+          const displayValue =
+            kpi.value === "₹0" && "fallback" in kpi && kpi.fallback
+              ? `${"prefix" in kpi ? kpi.prefix : ""}${kpi.fallback.toLocaleString()}`
+              : kpi.value === "0h" && "fallback" in kpi && kpi.fallback
+                ? `${kpi.fallback}h`
+                : kpi.value === "0" && "fallback" in kpi && kpi.fallback
+                  ? String(kpi.fallback)
+                  : kpi.value;
+          return (
+            <GlassCard key={i} tone="subtle">
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.02] ring-1 ring-inset ring-white/10">
+                  <kpi.icon className="h-5 w-5 text-brand-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-ink-400 uppercase tracking-wider">
+                    {kpi.label}
+                  </p>
+                  <p className="text-2xl font-semibold text-white">
+                    {displayValue}
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
+          );
+        })}
+      </div>
+
+      {/* ── Department Status Grid ────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {DEPT_ORDER.map((id) => {
+          const dept = deptConfigMap[id];
+          const status = engine.departmentStatus[id];
+          const badge = deptToneBadge(status.tone);
+          const Icon = dept?.icon;
+          return (
+            <GlassCard key={id}>
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-inset ring-white/10"
+                  style={{
+                    boxShadow: `0 0 20px ${dept?.color?.glow ?? "transparent"}`,
+                  }}
+                >
+                  {Icon && (
+                    <Icon
+                      className="h-5 w-5"
+                      style={{ color: dept.color.primary }}
+                    />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-medium text-white text-sm truncate">
+                      {dept?.name}
+                    </h3>
+                    <Badge
+                      tone={badge.tone}
+                      dot
+                      pulse={status.tone === "working"}
+                      size="xs"
+                    >
+                      {badge.label}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-ink-400 mt-1 truncate">
+                    {status.line}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-[10px] text-ink-500">
+                      {status.completedTasksToday} tasks today
+                    </span>
+                    <span className="text-ink-700">·</span>
+                    <span className="text-[10px] text-ink-500">
+                      {dept?.agents?.filter((a) => a.status === "active").length ??
+                        0}{" "}
+                      agents online
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+          );
+        })}
+      </div>
+
+      {/* ── Live Execution + Tool Calls ───────────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        {/* Live Execution Panel */}
+        <GlassCard className="lg:col-span-2" noPadding>
+          <div className="p-4 border-b border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">
+                Live Execution
+              </h2>
+              {activeTask && (
+                <Badge tone="cyan" size="xs" dot pulse>
+                  Running
+                </Badge>
+              )}
+            </div>
+            {activeTask ? (
+              <div className="mt-1">
+                <p className="text-xs text-ink-300 truncate">
+                  {activeTask.title}
+                </p>
+                <div className="mt-2 h-1 w-full rounded-full bg-white/[0.06] overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-brand-500 to-cyan-400 transition-all duration-500"
+                    style={{ width: `${activeTask.progress}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10px] text-ink-500">
+                    {activeTask.assignee} ·{" "}
+                    {deptConfigMap[activeTask.department]?.name}
+                  </span>
+                  <span className="text-[10px] text-ink-500">
+                    {activeTask.progress}%
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-ink-500 mt-1">No active tasks</p>
+            )}
           </div>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-            {state.timeline.slice(0, 12).map((event, i) => (
-              <ActivityItem key={`${event.id}-${i}`} event={event} />
-            ))}
-            {state.timeline.length === 0 && (
-              <div className="py-8 text-center text-[12px] italic text-ink-500">
-                No activity yet — your workforce will start working automatically.
+          <div className="p-4 max-h-[400px] overflow-y-auto">
+            {activeToolCalls.length > 0 ? (
+              <div className="relative">
+                <div className="absolute left-[11px] top-3 bottom-3 w-px bg-white/[0.06]" />
+                <div className="space-y-3">
+                  {activeToolCalls.map((tc) => (
+                    <div
+                      key={tc.id}
+                      className="relative flex items-start gap-3"
+                    >
+                      <div className="relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink-950 ring-1 ring-inset ring-white/10">
+                        {tc.status === "running" ? (
+                          <Loader2 className="h-3 w-3 text-brand-400 animate-spin" />
+                        ) : (
+                          <Check className="h-3 w-3 text-emerald-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 pb-1">
+                        <p className="text-xs text-white truncate">
+                          {tc.toolName}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge tone={deptBadgeTone(tc.department)} size="xs">
+                            {deptConfigMap[tc.department]?.name}
+                          </Badge>
+                          {tc.duration != null && (
+                            <span className="text-[10px] text-ink-500">
+                              {Math.round(tc.duration)}ms
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : activeTask ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 text-brand-400 animate-spin" />
+                <p className="text-xs text-ink-500 mt-2">
+                  Executing steps...
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Bot className="h-8 w-8 text-ink-600" />
+                <p className="text-xs text-ink-500 mt-2">
+                  Waiting for incoming work
+                </p>
+                <p className="text-[10px] text-ink-600 mt-1">
+                  Customer messages will appear here
+                </p>
               </div>
             )}
           </div>
         </GlassCard>
 
-        {/* Quick Actions + Notifications */}
-        <div className="space-y-4">
-          <GlassCard className="p-6" tilt={false}>
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
-              <Zap className="h-4 w-4 text-brand-300" />
-              Quick Actions
-            </h3>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <QuickActionBtn icon={MessageSquare} label="Reply to Inbox" subtitle={`${state.inbox.length} unread`} />
-              <QuickActionBtn icon={CheckCircle2} label="Approve Pending" subtitle={`${state.attention.filter(a => a.kind === "approval").length} waiting`} />
-              <QuickActionBtn icon={ShoppingBag} label="Create Order" subtitle="New customer order" />
-              <QuickActionBtn icon={Target} label="Book Appointment" subtitle="Schedule a slot" />
+        {/* Tool Calls Feed */}
+        <GlassCard className="lg:col-span-3" noPadding>
+          <div className="p-4 border-b border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">Tool Calls</h2>
+              <Badge tone="muted" size="xs">
+                {engine.toolCalls.length} total
+              </Badge>
             </div>
-          </GlassCard>
-
-          <GlassCard className="p-6" tilt={false}>
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
-              <Shield className="h-4 w-4 text-emerald-300" />
-              Needs Your Attention
-            </h3>
-            <div className="mt-4 space-y-2 max-h-[200px] overflow-y-auto pr-1">
-              {state.attention.length === 0 ? (
-                <div className="py-4 text-center text-[12px] italic text-ink-500">
-                  All clear — nothing needs approval right now.
-                </div>
-              ) : (
-                state.attention.slice(0, 5).map((item) => (
-                  <AttentionItem key={item.id} item={item} />
-                ))
-              )}
-            </div>
-          </GlassCard>
-        </div>
-      </motion.div>
-
-      {/* Ask Azolik - Small floating button */}
-      <AskAzolikButton />
-    </div>
-  );
-}
-
-function KPICard({
-  icon: Icon,
-  iconColor,
-  label,
-  value,
-  delta,
-  trend,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  iconColor: string;
-  label: string;
-  value: string;
-  delta: string;
-  trend: "up" | "down";
-}) {
-  return (
-    <GlassCard className="flex items-center gap-4 p-5" tilt={false}>
-      <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-white/10", iconColor)}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="min-w-0">
-        <div className="text-[12px] text-ink-400">{label}</div>
-        <div className="mt-0.5 text-[22px] font-semibold text-white">{value}</div>
-        <div className="mt-1 flex items-center gap-1.5">
-          <TrendingUp className={cn("h-3 w-3", trend === "up" ? "text-emerald-300" : "text-rose-300")} />
-          <span className="text-[11px] font-medium text-ink-300">{delta}</span>
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
-function DepartmentStatusCard({
-  dept,
-  statusInfo,
-  StatusIcon,
-  isActive,
-  isWorking,
-  currentJobs,
-  running,
-  waitingApproval,
-  completedToday,
-}: {
-  dept: any;
-  statusInfo: { label: string; tone: "emerald" | "amber" | "muted" | "brand"; icon: any };
-  StatusIcon: React.ComponentType<{ className?: string }>;
-  isActive: boolean;
-  isWorking: boolean;
-  currentJobs: string[];
-  running: number;
-  waitingApproval: number;
-  completedToday: number;
-}) {
-  const deptColor = dept.color;
-  const Icon = dept.icon;
-
-  return (
-    <GlassCard className="relative p-5" tilt={false} interactive={false}>
-      <div className="pointer-events-none absolute -right-16 -top-16 h-[200px] w-[200px] rounded-full opacity-20 blur-[60px]" style={{ background: deptColor.glow }} />
-      
-      <div className="relative flex flex-col h-full">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className={cn("relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]", deptColor.bg)}>
-              <Icon className={cn("h-5 w-5", deptColor.text)} strokeWidth={1.9} />
-            </div>
-            <div>
-              <h4 className="text-[14.5px] font-semibold text-white">{dept.name}</h4>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <StatusIcon className={cn("h-3 w-3", isActive ? "text-emerald-300" : "text-ink-400")} />
-                <span className="text-[11px] font-medium text-ink-300">{statusInfo.label}</span>
-                {isWorking && (
-                  <span className="relative flex h-1.5 w-1.5 items-center justify-center">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  </span>
-                )}
-              </div>
-            </div>
+            <p className="text-[11px] text-ink-500 mt-0.5">
+              Real-time activity across all departments
+            </p>
           </div>
-          {isActive && (
-            <Badge tone="emerald" dot size="sm">
-              <Zap className="h-2.5 w-2.5" /> Online
+          <div className="divide-y divide-white/[0.04] max-h-[400px] overflow-y-auto">
+            {engine.toolCalls.slice(0, 15).map((tc) => (
+              <div
+                key={tc.id}
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02] transition-colors"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.03] ring-1 ring-inset ring-white/[0.06]">
+                  {tc.status === "running" ? (
+                    <Loader2 className="h-3.5 w-3.5 text-brand-400 animate-spin" />
+                  ) : (
+                    <Wrench className="h-3.5 w-3.5 text-emerald-400" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-white truncate">{tc.toolName}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Badge tone={deptBadgeTone(tc.department)} size="xs">
+                      {deptConfigMap[tc.department]?.name}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <Badge
+                    tone={tc.status === "running" ? "brand" : "emerald"}
+                    size="xs"
+                  >
+                    {tc.status === "running" ? "Running" : "Done"}
+                  </Badge>
+                  {tc.duration != null && (
+                    <p className="text-[10px] text-ink-500 mt-0.5">
+                      {Math.round(tc.duration)}ms
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+            {engine.toolCalls.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Wrench className="h-6 w-6 text-ink-600" />
+                <p className="text-xs text-ink-500 mt-2">
+                  No tool calls yet
+                </p>
+                <p className="text-[10px] text-ink-600 mt-1">
+                  They'll stream in as work happens
+                </p>
+              </div>
+            )}
+          </div>
+        </GlassCard>
+      </div>
+
+      {/* ── Attention Items ───────────────────────────────────── */}
+      {engine.attention.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white">
+              Needs Attention
+            </h2>
+            <Badge tone="amber" size="xs">
+              {engine.attention.length} items
             </Badge>
-          )}
-        </div>
-
-        {/* Current Jobs */}
-        <div className="mt-4 flex-1">
-          {currentJobs.length > 0 ? (
-            <div className="space-y-1.5">
-              {currentJobs.map((job, i) => (
-                <div key={i} className="flex items-center gap-2 text-[11.5px] text-ink-300">
-                  <span className="relative flex h-1.5 w-1.5">
-                    {i === 0 && isWorking && (
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                    )}
-                    <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", i === 0 && isWorking ? "bg-emerald-400" : "bg-ink-500")} />
-                  </span>
-                  <span className="truncate">{job}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-[11.5px] italic text-ink-500">
-              {isActive ? "On standby — ready for work" : "Click to activate"}
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="mt-4 pt-4 border-t border-white/[0.06] flex flex-col gap-2">
-          <Button
-            size="sm"
-            variant={isActive ? "secondary" : "primary"}
-            className="w-full justify-center gap-1.5"
-            onClick={() => window.location.href = `/departments/${dept.id}`}
-          >
-            <Building2 className="h-3.5 w-3.5" /> Open Department
-          </Button>
-          <div className="flex gap-2">
-            <Button size="sm" variant="ghost" className="flex-1 justify-center text-[11px]">
-              <Settings2 className="h-3 w-3 mr-1" /> Settings
-            </Button>
-            <Button size="sm" variant="ghost" className="flex-1 justify-center text-[11px]">
-              <Activity className="h-3 w-3 mr-1" /> Analytics
-            </Button>
           </div>
-          {isActive && (
-            <Button size="sm" variant="ghost" className="w-full justify-center text-[11px] text-amber-300 hover:text-amber-100 hover:bg-amber-500/10">
-              <Shield className="h-3 w-3 mr-1" /> Pause
-            </Button>
-          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {engine.attention.map((item) => (
+              <GlassCard key={item.id} interactive>
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      item.severity === "urgent"
+                        ? "bg-rose-500/10"
+                        : item.severity === "warn"
+                          ? "bg-amber-500/10"
+                          : "bg-brand-500/10"
+                    }`}
+                  >
+                    {item.severity === "urgent" ? (
+                      <AlertTriangle className="h-4 w-4 text-rose-400" />
+                    ) : (
+                      <Bell className="h-4 w-4 text-amber-400" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-ink-400 mt-0.5">{item.detail}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge tone={deptBadgeTone(item.department)} size="xs">
+                        {deptConfigMap[item.department]?.name}
+                      </Badge>
+                      <span className="text-[10px] text-ink-500">
+                        {formatTimeAgo(item.at)}
+                      </span>
+                    </div>
+                  </div>
+                  <Button variant="secondary" size="xs" className="shrink-0">
+                    Review
+                  </Button>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
         </div>
-      </div>
-    </GlassCard>
-  );
-}
-
-function ActivityItem({ event }: { event: any }) {
-  const timeAgo = formatTimeAgo(event.at);
-  const icons: Record<string, any> = {
-    tool_call: { icon: Bot, color: "text-brand-300" },
-    task_completed: { icon: CheckCircle2, color: "text-emerald-300" },
-    decision: { icon: Target, color: "text-violet-300" },
-    handoff: { icon: Activity, color: "text-amber-300" },
-    inbound: { icon: MessageSquare, color: "text-cyan-300" },
-    alert: { icon: Shield, color: "text-rose-300" },
-  };
-  const { icon: Icon, color } = icons[event.type] || { icon: Bot, color: "text-ink-400" };
-
-  return (
-    <div className="flex items-start gap-3">
-      <div className="relative flex-shrink-0">
-        <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.03] ring-1 ring-inset ring-white/5", color)}>
-          <Icon className="h-3.5 w-3.5" />
-        </div>
-        <div className="absolute left-3 top-7 bottom-0 w-0.5 bg-white/[0.04]" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <span className="text-[12.5px] font-medium text-white">{event.title}</span>
-          <span className="text-[10px] text-ink-500">{timeAgo}</span>
-        </div>
-        <p className="mt-0.5 text-[11.5px] text-ink-400 truncate">{event.description}</p>
-        <div className="mt-1 flex items-center gap-2 text-[10px] text-ink-500">
-          <span className="uppercase tracking-wider">{event.department?.toUpperCase()}</span>
-          {event.status === "success" && <span className="text-emerald-300">✓ Completed</span>}
-          {event.status === "running" && <span className="text-brand-300">⟳ Running</span>}
-          {event.status === "info" && <span className="text-ink-400">ℹ Info</span>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AttentionItem({ item }: { item: { severity: "info" | "warn" | "urgent"; title: string; detail: string; at: number; kind: string } }) {
-  const severityColors: Record<"info" | "warn" | "urgent", string> = {
-    info: "text-brand-300 bg-brand-500/10 border-brand-400/20",
-    warn: "text-amber-300 bg-amber-500/10 border-amber-400/20",
-    urgent: "text-rose-300 bg-rose-500/10 border-rose-400/20",
-  };
-  return (
-    <div className={cn("flex items-start gap-3 p-3 rounded-xl border", severityColors[item.severity])}>
-      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/[0.05]">
-        <Shield className="h-3 w-3" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] font-medium text-white">{item.title}</span>
-          <span className="text-[10px] text-ink-500">{formatTimeAgo(item.at)}</span>
-        </div>
-        <p className="mt-0.5 text-[11px] text-ink-400">{item.detail}</p>
-        <div className="mt-2 flex items-center gap-2">
-          <Badge tone={item.severity === "urgent" ? "rose" : item.severity === "warn" ? "amber" : "brand"} size="xs">
-            {item.kind}
-          </Badge>
-          <Button size="xs" variant="secondary" className="h-6 px-2 text-[10.5px]">Review</Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function QuickActionBtn({ icon: Icon, label, subtitle }: { icon: any; label: string; subtitle: string }) {
-  return (
-    <button className="group flex flex-col items-start gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-left transition-all hover:border-white/10 hover:bg-white/[0.04]">
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-brand-300 group-hover:scale-110 transition-transform" />
-        <span className="text-[13px] font-medium text-white">{label}</span>
-      </div>
-      <span className="text-[11px] text-ink-500 ml-6">{subtitle}</span>
-    </button>
-  );
-}
-
-function AskAzolikButton() {
-  const [open, setOpen] = React.useState(false);
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3, type: "spring", stiffness: 280, damping: 26 }}
-      className="fixed bottom-6 right-6 z-50"
-    >
-      <button
-        onClick={() => setOpen(!open)}
-        className="group flex items-center gap-3 rounded-2xl bg-ink-950/80 backdrop-blur-xl border border-white/10 px-4 py-3 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)] transition-all hover:border-brand-400/30 hover:shadow-[0_12px_40px_-8px_rgba(95,118,255,0.3)]"
-      >
-        <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700">
-          <Sparkles className="h-4.5 w-4.5 text-white" />
-          {!open && (
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-xl bg-brand-500/40" />
-          )}
-        </div>
-        <div className="hidden sm:block text-left">
-          <p className="text-[13px] font-medium text-white">Need anything?</p>
-          <p className="text-[11px] text-ink-400">Ask Azolik…</p>
-        </div>
-        <span className={cn("transition-transform", open && "rotate-45")}>
-          <svg className="h-4 w-4 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        </span>
-      </button>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-          className="absolute bottom-16 right-0 w-[360px]"
-        >
-          <GlassCard tone="strong" className="p-0 overflow-hidden" tilt={false}>
-            <div className="p-4 border-b border-white/10">
-              <p className="text-[13px] font-medium text-white">Ask Azolik</p>
-              <p className="text-[11px] text-ink-400 mt-0.5">What do you need help with?</p>
-            </div>
-            <div className="p-4 space-y-3">
-              <SuggestionChip label={'"How many orders today?"'} />
-              <SuggestionChip label={'"Show me pending approvals"'} />
-              <SuggestionChip label={'"Revenue this week"'} />
-              <SuggestionChip label={'"Pause Marketing department"'} />
-              <div className="pt-2">
-                <input
-                  type="text"
-                  placeholder="Type your request…"
-                  className="w-full rounded-xl border border-white/10 bg-ink-900/50 px-3 py-2 text-[13px] text-white placeholder:text-ink-500 focus:border-brand-400/40 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-                />
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
       )}
-    </motion.div>
-  );
-}
 
-function SuggestionChip({ label }: { label: string }) {
-  return (
-    <button className="w-full flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left text-[12px] text-ink-300 hover:border-white/10 hover:bg-white/[0.04] transition-all">
-      <svg className="h-3.5 w-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-      <span>{label}</span>
-    </button>
+      {/* ── Recent Inbox (from Supabase) ──────────────────────── */}
+      {supabase.inbox.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-white">Open Conversations</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {supabase.inbox.slice(0, 4).map((conv: any) => (
+              <GlassCard key={conv.id} interactive>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-inset ring-white/[0.06]">
+                    <Users className="h-3.5 w-3.5 text-ink-300" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-white truncate">
+                      {conv.customer_name}
+                    </p>
+                    <p className="text-[11px] text-ink-400 truncate">
+                      {conv.last_message}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-ink-500 shrink-0">
+                    {new Date(conv.last_message_at).toLocaleTimeString()}
+                  </span>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
-}
-
-function formatTimeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-  return `${Math.floor(diff / 86400000)}d ago`;
 }

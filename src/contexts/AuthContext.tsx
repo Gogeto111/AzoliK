@@ -1,4 +1,3 @@
-// Auth Context - Real Firebase Auth with Google, Microsoft, Email OTP
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { 
   User, 
@@ -6,63 +5,45 @@ import {
   signInWithPopup, 
   signOut, 
   GoogleAuthProvider,
-  OAuthProvider,
   setPersistence,
   browserLocalPersistence,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-  updateProfile,
-  signInWithCredential,
-  PhoneAuthProvider,
-  RecaptchaVerifier,
-  ConfirmationResult
+  updateProfile as firebaseUpdateProfile,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
 } from "firebase/auth";
 import { auth, googleProvider, db } from "@/lib/firebase";
-import { createUserProfile, getUserProfile, updateUserProfile, updateUserLastLogin, getBusiness } from "@/lib/firebase";
-import { UserProfile, BusinessProfile } from "@/lib/firebase";
+import { sb, UserProfile, BusinessProfile, OnboardingData, createDefaultUserProfile, createDefaultDepartments } from "@/lib/supabase";
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
+  business: BusinessProfile | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithMicrosoft: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   sendOTP: (email: string) => Promise<void>;
   verifyOTP: (email: string, code: string) => Promise<boolean>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
+  updateProfile: (data: Partial<UserProfile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  completeOnboarding: (data: OnboardingData) => Promise<BusinessProfile>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Microsoft OAuth Provider
-const microsoftProvider = new OAuthProvider("microsoft.com");
-microsoftProvider.setCustomParameters({
-  prompt: "consent",
-  tenant: "common",
-});
-microsoftProvider.addScope("openid");
-microsoftProvider.addScope("profile");
-microsoftProvider.addScope("email");
-microsoftProvider.addScope("offline_access");
-microsoftProvider.addScope("https://graph.microsoft.com/User.Read");
-microsoftProvider.addScope("https://graph.microsoft.com/Mail.Read");
-microsoftProvider.addScope("https://graph.microsoft.com/Mail.Send");
-microsoftProvider.addScope("https://graph.microsoft.com/Calendars.Read");
-microsoftProvider.addScope("https://graph.microsoft.com/Files.ReadWrite");
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [business, setBusiness] = useState<BusinessProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set auth persistence
     if (auth) {
       import("firebase/auth").then(({ setPersistence, browserLocalPersistence }) => {
         setPersistence(auth, browserLocalPersistence).catch(console.error);
@@ -73,21 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        // Update last login
-        await updateUserLastLogin(firebaseUser.uid);
-        
-        // Get or create user profile
-        let userProfile = await getUserProfile(firebaseUser.uid);
-        if (!userProfile) {
-          userProfile = await createUserProfile(firebaseUser.uid, {
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || "",
-            photoURL: firebaseUser.photoURL || "",
-          });
-        }
-        setProfile(userProfile);
+        await refreshProfile();
+        await refreshBusiness();
       } else {
         setProfile(null);
+        setBusiness(null);
       }
       setLoading(false);
     });
@@ -95,20 +66,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  const refreshProfile = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await sb
+        .from("user_profiles")
+        .select("*")
+        .eq("auth_user_id", user.uid)
+        .single();
+      
+      if (error && error.code === "PGRST116") {
+        // Profile doesn't exist, create it
+        const newProfile = createDefaultUserProfile(user.uid, user.email || "", user.displayName || "");
+        const { data: created, error: createError } = await sb
+          .from("user_profiles")
+          .insert(newProfile)
+          .select()
+          .single();
+        
+        if (!createError) {
+          setProfile(created);
+        }
+      } else if (data) {
+        setProfile(data);
+        // Update last login
+        await sb.from("user_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", data.id);
+      }
+    } catch (e) {
+      console.error("Error refreshing profile:", e);
+    }
+  };
+
+  const refreshBusiness = async () => {
+    if (!profile?.business_id) {
+      setBusiness(null);
+      return;
+    }
+    try {
+      const { data, error } = await sb
+        .from("businesses")
+        .select("*")
+        .eq("id", profile.business_id)
+        .single();
+      
+      if (!error && data) {
+        setBusiness(data);
+      }
+    } catch (e) {
+      console.error("Error refreshing business:", e);
+    }
+  };
+
   const signInWithGoogle = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Google sign-in error:", error);
-      throw error;
-    }
-  };
-
-  const signInWithMicrosoft = async () => {
-    try {
-      await signInWithPopup(auth, microsoftProvider);
-    } catch (error) {
-      console.error("Microsoft sign-in error:", error);
       throw error;
     }
   };
@@ -125,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(result.user, { displayName });
+      await firebaseUpdateProfile(result.user, { displayName });
     } catch (error) {
       console.error("Email sign-up error:", error);
       throw error;
@@ -133,33 +146,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const sendOTP = async (email: string) => {
-    // In production, this would call a Firebase Function to send OTP via email
-    // For now, we'll use Firebase Auth's email link sign-in as OTP alternative
     const actionCodeSettings = {
       url: window.location.origin + "/auth/callback",
       handleCodeInApp: true,
     };
     
-    // Using Firebase's email link sign-in as OTP mechanism
-    await import("firebase/auth").then(({ sendSignInLinkToEmail }) => {
-      return sendSignInLinkToEmail(auth, email, actionCodeSettings);
-    });
-    
-    // Store email for verification
+    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
     sessionStorage.setItem("otp_email", email);
   };
 
   const verifyOTP = async (email: string, code: string): Promise<boolean> => {
-    // In production, verify OTP via Firebase Function
-    // For now, we'll use email link sign-in completion
     try {
-      const result = await import("firebase/auth").then(({ signInWithEmailLink }) => 
-        signInWithEmailLink(auth, email, window.location.href)
-      );
-      return !!result.user;
+      if (isSignInWithEmailLink(auth, window.location.href)) {
+        const result = await signInWithEmailLink(auth, email, window.location.href);
+        return !!result.user;
+      }
+      return false;
     } catch {
-      // Fallback: check if code matches a stored OTP (for demo)
-      // In production, use Firebase Functions with Twilio/SendGrid
       return false;
     }
   };
@@ -176,39 +179,136 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth);
+      setProfile(null);
+      setBusiness(null);
     } catch (error) {
       console.error("Logout error:", error);
       throw error;
     }
   };
 
-  const updateUserProfileData = async (data: Partial<UserProfile>) => {
-    if (!user) throw new Error("No user logged in");
-    setProfile(prev => prev ? { ...prev, ...data } : null );
-    // Update in Firestore would go here
+  const updateProfile = async (data: Partial<UserProfile>) => {
+    if (!user || !profile) throw new Error("No user logged in");
+    try {
+      const { data: updated, error } = await sb
+        .from("user_profiles")
+        .update({ ...data, updated_at: new Date().toISOString() })
+        .eq("id", profile.id)
+        .select()
+        .single();
+      
+      if (!error) setProfile(updated);
+    } catch (error) {
+      console.error("Update profile error:", error);
+      throw error;
+    }
   };
 
-  const refreshProfile = async () => {
-    if (!user) return;
-    const freshProfile = await getUserProfile(user.uid);
-    setProfile(freshProfile);
+  const completeOnboarding = async (data: OnboardingData): Promise<BusinessProfile> => {
+    if (!user || !profile) throw new Error("No user logged in");
+
+    // Create business
+    const businessData = {
+      owner_id: profile.id,
+      name: data.businessName,
+      type: data.businessType,
+      phone: data.phone,
+      email: data.email,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      country: data.country,
+      postal_code: data.postalCode,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      place_id: data.placeId,
+      currency: data.currency,
+      timezone: data.timezone,
+      settings: {
+        auto_reply: true,
+        business_hours: {
+          enabled: true,
+          timezone: data.timezone,
+          schedule: {
+            monday: { open: "09:00", close: "18:00", closed: false },
+            tuesday: { open: "09:00", close: "18:00", closed: false },
+            wednesday: { open: "09:00", close: "18:00", closed: false },
+            thursday: { open: "09:00", close: "18:00", closed: false },
+            friday: { open: "09:00", close: "18:00", closed: false },
+            saturday: { open: "09:00", close: "14:00", closed: false },
+            sunday: { open: "10:00", close: "14:00", closed: true },
+          },
+        },
+        auto_invoice: true,
+        tax_rate: 18,
+        currency_format: "₹",
+      },
+      integrations: {},
+      departments: data.departments,
+    };
+
+    const { data: business, error: bizError } = await sb
+      .from("businesses")
+      .insert(businessData)
+      .select()
+      .single();
+
+    if (bizError) throw bizError;
+
+    // Create departments
+    const departments = createDefaultDepartments(business.id, data.departments);
+    for (const dept of departments) {
+      await sb.from("departments").insert(dept);
+    }
+
+    // Store knowledge base
+    for (const [category, items] of Object.entries(data.knowledge)) {
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          await sb.from("knowledge_base").insert({
+            business_id: business.id,
+            category,
+            title: item,
+            content: item,
+            metadata: {},
+          });
+        }
+      }
+    }
+
+    // Update user profile
+    await sb
+      .from("user_profiles")
+      .update({ 
+        business_id: business.id, 
+        onboarding_complete: true, 
+        onboarding_step: 10,
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", profile.id);
+
+    setBusiness(business);
+    setProfile(prev => prev ? { ...prev, business_id: business.id, onboarding_complete: true } : null);
+
+    return business;
   };
 
   return (
     <AuthContext.Provider value={{
       user,
       profile,
+      business,
       loading,
       signInWithGoogle,
-      signInWithMicrosoft,
       signInWithEmail,
       signUpWithEmail,
       sendOTP,
       verifyOTP,
       resetPassword,
       logout,
-      updateUserProfile: updateUserProfileData,
+      updateProfile,
       refreshProfile,
+      completeOnboarding,
     }}>
       {children}
     </AuthContext.Provider>
@@ -223,36 +323,15 @@ export function useAuth() {
   return context;
 }
 
-// Hook for checking if user has completed onboarding
+export function useBusiness() {
+  const { business } = useAuth();
+  return { business, loading: !business };
+}
+
 export function useOnboarding() {
   const { profile } = useAuth();
   return {
-    isComplete: profile?.onboardingComplete ?? false,
-    profile,
+    isComplete: profile?.onboarding_complete ?? false,
+    step: profile?.onboarding_step ?? 0,
   };
-}
-
-// Hook for getting user's business
-export function useBusiness() {
-  const { profile } = useAuth();
-  const [business, setBusiness] = useState<BusinessProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!profile?.businessId) {
-      setBusiness(null);
-      setLoading(false);
-      return;
-    }
-
-    const fetchBusiness = async () => {
-      const { getBusiness } = await import("@/lib/firebase");
-      const business = await getBusiness(profile.businessId!);
-      setBusiness(business);
-      setLoading(false);
-    };
-    fetchBusiness();
-  }, [profile]);
-
-  return { business, loading };
 }

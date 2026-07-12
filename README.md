@@ -1,149 +1,174 @@
-# Azolik — AI Workforce OS
+# Azolik - AI Workforce Platform
 
-The operating system for a modern AI-powered company. Six AI departments. Forty-four specialized agents. One cinematic, intelligent workspace.
+A complete business automation platform with 6 AI departments (Support, Sales, Marketing, Finance, Operations, HR) powered by 44 specialized agents.
 
 ## Features
 
-### Core MVP (Must Have)
-- **AI Departments** — Support, Sales, Marketing, Finance, Operations, HR
-- **CEO Dashboard** — Business health, today's results, department status
-- **Integrations** — WhatsApp, Gmail, Google Sheets, Google Calendar
-- **Knowledge Base** — PDFs, Excel, FAQs, Catalogs, Policies
-- **Workflow Automation** — Visual workflow builder for business processes
-- **Human Approval** — AI drafts, you approve/edit/auto-send
-- **Activity Feed** — GitHub-style timeline of all AI actions
-- **Analytics** — Hours saved, revenue assisted, response time
-- **Multi-language** — English, Hindi, Hinglish support
-- **Authentication** — Business/Employee roles, permissions, 2FA
+- **Google Authentication** - Firebase Auth with Google, Microsoft, Email OTP
+- **7-Step Onboarding** - Business info → Discovery → Maps lookup → Confirm → Connect apps → Departments → Knowledge → Training → Launch
+- **Mission Control Dashboard** - Real-time department status, KPIs, activity feed
+- **Supabase Database** - PostgreSQL with RLS, real-time subscriptions
+- **Integrations** - Gmail, Google Sheets, Google Calendar, WhatsApp, Shopify, Razorpay, HubSpot
+- **Analytics** - Revenue assisted, customers helped, hours saved, departments active
+- **AI Engine** - Message → Knowledge → Reply → CRM → Book → Invoice workflow
 
-### Should Have
-- CRM pipeline
-- Calendar appointments
-- Contacts management
-- Notification center
-- Marketplace for department templates
-- Reports (weekly/monthly)
-- Customer memory
+## Quick Start
 
-### Wow Features
-- **AI Workforce View** — Departments visibly "thinking → working → done"
-- **One-Click Department Install** — Connected → Working in seconds
-- **Live Activity Feed** — Real-time timeline like GitHub
-- **Ask Azolik** — CEO assistant ("What happened today?")
-- **Business Health Score** — 96% with reasons
-
----
-
-## Tech Stack
-
-- **React 19** + TypeScript
-- **Vite** + Rolldown (lightning fast)
-- **Tailwind CSS v4** + custom design system
-- **Framer Motion** — Apple-quality animations
-- **@xyflow/react** — Visual workflow builder
-- **Recharts** — Analytics charts
-- **Lucide React** — Icons
-
----
-
-## Getting Started
-
+### 1. Clone and Install
 ```bash
-# Install dependencies
+cd azolik
 npm install
-
-# Development server
-npm run dev
-
-# Production build
-npm run build
-
-# Preview production build
-npm run preview
-
-# Lint & typecheck
-npm run lint
 ```
 
----
+### 2. Set Up Environment Variables
+Copy `.env.example` to `.env` and fill in your credentials:
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+- **Firebase** - Get from Firebase Console
+- **Supabase** - Get from Supabase Dashboard
+- **Google Maps API** - For business discovery
+- **Google OAuth** - For Gmail/Sheets/Calendar integrations
+
+### 3. Set Up Supabase Database
+1. Create a new Supabase project
+2. Run the SQL from `supabase/schema.sql` in the SQL Editor
+3. Enable Row Level Security (already in schema)
+
+### 4. Set Up Firebase
+1. Create a Firebase project
+2. Enable Authentication (Google, Microsoft, Email/Password)
+3. Add authorized domains
+4. Copy config to `.env`
+
+### 5. Run Development Server
+```bash
+npm run dev
+```
 
 ## Project Structure
 
 ```
-src/
-├── components/
-│   ├── ui/           # GlassCard, Button, Avatar, Badge, etc.
-│   ├── layout/       # AppShell, Sidebar, Topbar
-│   ├── effects/      # AuroraBackground, NeuralNetwork, Particles
-│   ├── os/           # CommandPalette, AICopilot, DepartmentActivation
-│   ├── workflow/     # React Flow custom nodes/edges
-│   └── dashboard/    # Dashboard widgets
-├── pages/
-│   ├── Dashboard.tsx         # CEO view
-│   ├── Departments.tsx       # Department grid
-│   ├── DepartmentDetail.tsx  # Department view
-│   ├── Inbox.tsx             # Support inbox with AI suggestions
-│   ├── Automation.tsx        # Visual workflow builder
-│   ├── Integrations.tsx      # Connect tools
-│   ├── Knowledge.tsx         # Upload PDFs, Excel, FAQs
-│   ├── Analytics.tsx         # Business metrics
-│   ├── AIWorkforce.tsx       # Live department view
-│   ├── ActivityFeed.tsx      # GitHub-style timeline
-│   ├── Marketplace.tsx       # Department templates
-│   └── Settings.tsx          # Business/Profile/AI settings
-├── lib/
-│   ├── aiStore.tsx    # Central state (Zustand)
-│   ├── engine.ts      # Workforce simulation engine
-│   ├── hooks.ts       # Custom hooks
-│   └── utils.ts       # Helpers
-├── data/
-│   ├── departments.ts # Department configs
-│   └── mockData.ts    # Demo data
-└── types.ts           # TypeScript definitions
+azolik/
+├── src/
+│   ├── components/
+│   │   ├── dashboard/      # Dashboard widgets
+│   │   ├── onboarding/     # 7-step onboarding screens
+│   │   ├── ui/             # Reusable UI components
+│   │   └── layout/         # App shell, navigation
+│   ├── contexts/
+│   │   └── AuthContext.tsx # Firebase + Supabase auth
+│   ├── lib/
+│   │   ├── firebase.ts     # Firebase config
+│   │   ├── supabase.ts     # Supabase client & types
+│   │   ├── engine.ts       # AI engine state
+│   │   └── utils.ts        # Helpers
+│   ├── pages/
+│   │   ├── AuthPage.tsx    # Multi-step auth
+│   │   ├── OnboardingPage.tsx
+│   │   ├── Dashboard.tsx
+│   │   ├── Analytics.tsx
+│   │   └── ...
+│   ├── services/
+│   │   ├── google.ts       # Gmail/Sheets/Calendar APIs
+│   │   ├── whatsapp.ts     # WhatsApp Business API
+│   │   └── razorpay.ts     # Payment integration
+│   └── App.tsx             # Routes
+├── supabase/
+│   ├── schema.sql          # Database schema
+│   └── functions/          # Edge functions
+└── .env.example
 ```
 
----
+## Onboarding Flow
 
-## Design System
+1. **Welcome** - Introduction to Azolik
+2. **Sign In** - Google / Email OTP / Microsoft
+3. **Business Info** - Name, type, team size, channels
+4. **Discovery** - Google Maps lookup by phone
+5. **Confirm** - Review and verify business details
+6. **Connect Apps** - Gmail, Sheets, Calendar, WhatsApp, etc.
+7. **Departments** - Choose Support, Sales, Finance, etc.
+8. **Knowledge** - Products, services, FAQs, inventory, payments
+9. **Training** - AI trains on your data (~2 min)
+10. **Launch** - Mission Control dashboard
 
-### Colors
-- **Ink** — Dark neutrals (ink-950 to ink-100)
-- **Brand** — Blue/violet gradient (#5f76ff → #3b4fff)
-- **Accents** — Cyan, Emerald, Violet, Amber, Rose
+## Dashboard
 
-### Glass Cards
-Three tiers: `default`, `strong`, `subtle` with matched blur, border, highlight
+- **KPIs**: Revenue assisted, customers helped, appointments, orders, hours saved
+- **Departments**: Support (Working...), Sales (Following up...), Finance (Reconciling...)
+- **Live Activity**: Real-time task feed
+- **Attention Items**: Approvals, messages needing review
+- **Quick Actions**: Reply inbox, approve, create order, book appointment
 
-### Motion
-- Apple spring: `[0.22, 1, 0.36, 1]`
-- Per-component stiffness/damping/mass
-- Respects `prefers-reduced-motion`
+## Integrations
 
----
+| Service | Type | Features |
+|---------|------|----------|
+| Gmail | OAuth | Send/receive, invoices, threading |
+| Google Sheets | OAuth | Read/write, inventory sync |
+| Google Calendar | OAuth | Book appointments, reminders |
+| WhatsApp | Cloud API | Customer messaging, templates |
+| Shopify | OAuth | Orders, products, customers |
+| Razorpay | API Keys | UPI, cards, netbanking |
+| HubSpot | OAuth | CRM sync, deals, contacts |
+
+## AI Engine Workflow
+
+```
+Incoming Message
+       ↓
+Read Knowledge Base (vector search)
+       ↓
+Generate AI Reply (GPT-4o)
+       ↓
+Send Reply (WhatsApp/Email)
+       ↓
+Update CRM / Conversation
+       ↓
+Detect Actions:
+  ├─ Book Appointment → Calendar API
+  ├─ Create Invoice → Invoice table
+  ├─ Update Lead → CRM
+  └─ Create Task → Task queue
+       ↓
+Complete
+```
 
 ## Deployment
 
 ### Vercel (Recommended)
-1. Push to GitHub
-2. Import in Vercel
-3. Deploy — zero config
+```bash
+npm i -g vercel
+vercel
+```
+Add environment variables in Vercel dashboard.
 
 ### Docker
-```bash
-docker build -t azolik .
-docker run -p 80:80 azolik
+```dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+EXPOSE 3000
+CMD ["npm", "run", "preview"]
 ```
 
-### Mobile App
-```bash
-npx cap add ios
-npx cap add android
-npx cap sync
-npx cap open ios  # or android
-```
+## Tech Stack
 
----
+- **Frontend**: React 19, TypeScript, Vite
+- **Styling**: Tailwind CSS v4, Framer Motion
+- **Auth**: Firebase Auth
+- **Database**: Supabase (PostgreSQL)
+- **Charts**: Recharts
+- **State**: React Context + Supabase Realtime
+- **APIs**: Google APIs, WhatsApp Cloud API, Razorpay
 
 ## License
 
-MIT — Build your AI workforce.
+MIT

@@ -65,10 +65,6 @@ if (typeof window !== "undefined") {
 // Initialize services
 if (app) {
   try {
-    const { getAuth } = await import("firebase/auth");
-    const { getFirestore } = await import("firebase/firestore");
-    const { getStorage } = await import("firebase/storage");
-    
     auth = getAuth(app);
     db = getFirestore(app);
     storage = getStorage(app);

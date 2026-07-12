@@ -1,21 +1,12 @@
-// AuthPage - Clean Minimal Version
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle,
-  Loader2,
-  User,
-  Sparkles,
-  Zap,
-  Shield,
-  Search,
-  Save,
+import { 
+  Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, 
+  CheckCircle, Loader2, User, Sparkles, Zap, Shield, 
+  Search, Save, Building2, Users, MessageSquare, MapPin,
+  Check, X, Globe, Smartphone, Phone, HeartPulse,
+  Dumbbell, Wrench, Briefcase, Factory, GraduationCap,
+  Truck, Scale, UtensilsCrossed, Store, Sparkles as SparklesIcon
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/Button";
@@ -41,7 +32,7 @@ interface AuthFormData {
 }
 
 export function AuthPage({ onComplete }: { onComplete: () => void }) {
-  const { user, signInWithGoogle, signInWithMicrosoft, signInWithEmail, signUpWithEmail, sendOTP, verifyOTP } = useAuth();
+  const { user, signInWithGoogle, signInWithEmail, signUpWithEmail, sendOTP, verifyOTP, updateProfile } = useAuth();
   const [step, setStep] = useState<AuthStep>("welcome");
   const [formData, setFormData] = useState<AuthFormData>({ email: "", password: "", displayName: "", otp: "" });
   const [loading, setLoading] = useState(false);
@@ -59,21 +50,19 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
     }
   }, [otpCooldown]);
 
-  const handleProviderSignIn = useCallback(async (provider: "google" | "microsoft") => {
+  const handleProviderSignIn = useCallback(async (provider: "google") => {
     setLoading(true);
     setError(null);
     try {
       if (provider === "google") {
         await signInWithGoogle();
-      } else {
-        await signInWithMicrosoft();
       }
     } catch (err: any) {
       setError(err.message || "Sign in failed");
     } finally {
       setLoading(false);
     }
-  }, [signInWithGoogle, signInWithMicrosoft]);
+  }, [signInWithGoogle]);
 
   const handleEmailContinue = useCallback(async () => {
     if (!formData.email || !formData.email.includes("@")) {
@@ -159,7 +148,7 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      await signUpWithEmail(formData.email, formData.password, name.trim());
+      await updateProfile({ display_name: name.trim() } as Partial<any>);
       onComplete();
     } catch (err: any) {
       setError(err.message || "Failed to create account");
@@ -168,7 +157,6 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
     }
   };
 
-  // Step components defined inside to access component state
   const WelcomeStep = ({ onContinue }: { onContinue: () => void }) => (
     <div className="text-center space-y-6">
       <motion.h1
@@ -230,19 +218,7 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-500/20">
             <Sparkles className="h-4.5 w-4.5 text-brand-300" />
           </div>
-          <span className="text-[13px] font-medium text-white">Google</span>
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => handleProviderSignIn("microsoft")}
-          disabled={loading}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:text-white"
-        >
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600/30 to-blue-800/10 ring-1 ring-inset ring-white/10">
-            <Mail className="h-4.5 w-4.5 text-blue-300" />
-          </div>
-          <span className="text-[13px] font-medium text-white">Microsoft</span>
+          <span className="text-[13px] font-medium text-white">Continue with Google</span>
         </motion.button>
         <motion.button
           whileHover={{ scale: 1.02 }}
@@ -267,12 +243,12 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
 
   const EmailInputStep = ({ onContinue, onBack }: { onContinue: () => void; onBack: () => void }) => {
     const [email, setEmail] = useState("");
-    const [error, setError] = useState<string | null>(null);
+    const [localError, setLocalError] = useState<string | null>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!email || !email.includes("@")) {
-        setError("Please enter a valid email address");
+        setLocalError("Please enter a valid email address");
         return;
       }
       onContinue();
@@ -289,12 +265,12 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
           <Search className="h-4 w-4 text-ink-400" />
           <input
             value={email}
-            onChange={(e) => { setEmail(e.target.value); setError(null); }}
-            placeholder="Search activity..."
+            onChange={(e) => { setEmail(e.target.value); setLocalError(null); }}
+            placeholder="you@company.com"
             className="flex-1 bg-transparent text-[13.5px] text-white placeholder:text-ink-500 focus:outline-none"
           />
         </div>
-        {error && <p className="text-sm text-rose-400">{error}</p>}
+        {localError && <p className="text-sm text-rose-400">{localError}</p>}
 
         <Button size="lg" variant="primary" className="w-full gap-1" onClick={onContinue} disabled={!email || !email.includes("@")}>
           <ArrowRight className="h-4 w-4" /> Continue
@@ -310,29 +286,28 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
 
   const PasswordInputStep = ({ onSubmit, onBack }: { onSubmit: (e: React.FormEvent) => void; onBack: () => void }) => {
     const [password, setPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [localLoading, setLocalLoading] = useState(false);
+    const [localError, setLocalError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!password) {
-        setError("Please enter your password");
+        setLocalError("Please enter your password");
         return;
       }
       if (password.length < 6) {
-        setError("Password must be at least 6 characters");
+        setLocalError("Password must be at least 6 characters");
         return;
       }
 
-      setLoading(true);
-      setError(null);
+      setLocalLoading(true);
+      setLocalError(null);
       try {
         await onSubmit(e);
       } catch (err: any) {
-        setError(err.message || "Invalid credentials");
+        setLocalError(err.message || "Invalid credentials");
       } finally {
-        setLoading(false);
+        setLocalLoading(false);
       }
     };
 
@@ -362,8 +337,8 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
             </button>
           </div>
 
-          <Button size="lg" type="submit" className="w-full gap-2" disabled={loading || !password}>
-            {loading ? (
+          <Button size="lg" type="submit" className="w-full gap-2" disabled={localLoading || !password}>
+            {localLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-1" />
                 <span>Signing in...</span>
@@ -539,7 +514,6 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
     );
   };
 
-  // Render step components inline to access component state
   const renderStep = (step: AuthStep) => {
     switch (step) {
       case "welcome":
