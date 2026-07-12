@@ -1,37 +1,85 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import {
-  User,
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-  GoogleAuthProvider,
-  setPersistence,
-  browserLocalPersistence,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  updateProfile as firebaseUpdateProfile,
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
+  type User,
 } from "firebase/auth";
 import {
-  auth,
-  googleProvider,
-  db,
-  UserProfile,
-  BusinessProfile,
-  OnboardingData,
-  getUserProfile,
-  createUserProfile,
-  updateUserProfile,
-  createBusiness,
-  getBusiness,
-  createDepartment,
-  createDefaultUserProfile,
-  updateUserLastLogin,
-  updateBusiness as updateBusinessDoc,
+  type UserProfile,
+  type BusinessProfile,
+  type OnboardingData,
+  createDefaultBusinessProfile,
 } from "@/lib/firebase";
+
+const MOCK_USER = {
+  uid: "local-user",
+  email: "user@azolik.com",
+  displayName: "User",
+  emailVerified: true,
+  isAnonymous: false,
+  metadata: {} as any,
+  providerData: [],
+  refreshToken: "",
+  tenantId: null,
+  delete: async () => {},
+  getIdToken: async () => "",
+  getIdTokenResult: () => Promise.resolve({} as any),
+  reload: async () => {},
+  toJSON: () => ({}),
+  phoneNumber: null,
+  photoURL: null,
+  providerId: "local",
+} as unknown as User;
+
+const MOCK_PROFILE: UserProfile = {
+  uid: "local-user",
+  email: "user@azolik.com",
+  displayName: "User",
+  businessId: "local-business",
+  onboardingComplete: true,
+  onboardingStep: 10,
+  role: "owner",
+  preferences: {
+    notifications: { email: true, push: true, sms: false },
+    theme: "dark",
+    language: "en",
+    timezone: "Asia/Kolkata",
+  },
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  lastLoginAt: Date.now(),
+};
+
+const MOCK_BUSINESS: BusinessProfile = {
+  id: "local-business",
+  name: "My Business",
+  type: "ecommerce",
+  ownerId: "local-user",
+  phone: "+919999999999",
+  currency: "INR",
+  timezone: "Asia/Kolkata",
+  settings: {
+    autoReply: true,
+    businessHours: {
+      enabled: true,
+      timezone: "Asia/Kolkata",
+      schedule: {
+        monday: { open: "09:00", close: "18:00", closed: false },
+        tuesday: { open: "09:00", close: "18:00", closed: false },
+        wednesday: { open: "09:00", close: "18:00", closed: false },
+        thursday: { open: "09:00", close: "18:00", closed: false },
+        friday: { open: "09:00", close: "18:00", closed: false },
+        saturday: { open: "09:00", close: "14:00", closed: false },
+        sunday: { open: "10:00", close: "14:00", closed: true },
+      },
+    },
+    autoInvoice: true,
+    taxRate: 18,
+    currencyFormat: "\u20B9",
+  },
+  integrations: {},
+  departments: ["support", "sales", "marketing", "finance", "operations"],
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+};
 
 interface AuthContextType {
   user: User | null;
@@ -54,199 +102,39 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [business, setBusiness] = useState<BusinessProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-
-    if (auth) {
-      import("firebase/auth").then(({ setPersistence, browserLocalPersistence }) => {
-        setPersistence(auth, browserLocalPersistence).catch(console.error);
-      });
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      
-      if (firebaseUser) {
-        await refreshProfile(firebaseUser);
-        await refreshBusiness(firebaseUser);
-      } else {
-        setProfile(null);
-        setBusiness(null);
-      }
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  const refreshProfile = async (firebaseUser?: User | null) => {
-    const currentUser = firebaseUser ?? user;
-    if (!currentUser) return;
-    try {
-      let userProfile = await getUserProfile(currentUser.uid);
-      
-      if (!userProfile) {
-        const defaultProfile = createDefaultUserProfile(currentUser.uid, currentUser.email || "", currentUser.displayName || "");
-        userProfile = await createUserProfile(currentUser.uid, defaultProfile);
-        setProfile(userProfile);
-      } else {
-        setProfile(userProfile);
-        await updateUserLastLogin(currentUser.uid);
-      }
-    } catch (e) {
-      console.error("Error refreshing profile:", e);
-    }
-  };
-
-  const refreshBusiness = async (firebaseUser?: User | null) => {
-    const currentUser = firebaseUser ?? user;
-    // Re-read profile from state since it may have just been set
-    const currentProfile = profile ?? (currentUser ? await getUserProfile(currentUser.uid) : null);
-    if (!currentProfile?.businessId) {
-      setBusiness(null);
-      return;
-    }
-    try {
-      const businessData = await getBusiness(currentProfile.businessId);
-      if (businessData) {
-        setBusiness(businessData);
-      }
-    } catch (e) {
-      console.error("Error refreshing business:", e);
-    }
-  };
-
-  const signInWithGoogle = async () => {
-    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Google sign-in error:", error);
-      throw error;
-    }
-  };
-
-  const signInWithEmail = async (email: string, password: string) => {
-    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      console.error("Email sign-in error:", error);
-      throw error;
-    }
-  };
-
-  const signUpWithEmail = async (email: string, password: string, displayName: string) => {
-    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
-    try {
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      await firebaseUpdateProfile(result.user, { displayName });
-    } catch (error) {
-      console.error("Email sign-up error:", error);
-      throw error;
-    }
-  };
-
-  const sendOTP = async (email: string) => {
-    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
-    const actionCodeSettings = {
-      url: window.location.origin + "/auth/callback",
-      handleCodeInApp: true,
-    };
-    
-    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-    sessionStorage.setItem("otp_email", email);
-  };
-
-  const verifyOTP = async (email: string, code: string): Promise<boolean> => {
-    if (!auth) return false;
-    try {
-      if (isSignInWithEmailLink(auth, window.location.href)) {
-        const result = await signInWithEmailLink(auth, email, window.location.href);
-        return !!result.user;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  };
-
-  const resetPassword = async (email: string) => {
-    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
-    try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (error) {
-      console.error("Password reset error:", error);
-      throw error;
-    }
-  };
-
-  const logout = async () => {
-    if (!auth) { setProfile(null); setBusiness(null); return; }
-    try {
-      await signOut(auth);
-      setProfile(null);
-      setBusiness(null);
-    } catch (error) {
-      console.error("Logout error:", error);
-      throw error;
-    }
-  };
+  const [profile, setProfile] = useState<UserProfile>(MOCK_PROFILE);
+  const [business, setBusiness] = useState<BusinessProfile>(MOCK_BUSINESS);
 
   const updateProfile = async (data: Partial<UserProfile>) => {
-    if (!user || !profile) throw new Error("No user logged in");
-    try {
-      await updateUserProfile(user.uid, data);
-      setProfile(prev => prev ? { ...prev, ...data } : null);
-    } catch (error) {
-      console.error("Update profile error:", error);
-      throw error;
-    }
+    setProfile(prev => prev ? { ...prev, ...data } : null);
   };
 
   const updateBusiness = async (data: Partial<BusinessProfile>) => {
-    if (!business) throw new Error("No business found");
-    try {
-      await updateBusinessDoc(business.id, data);
-      setBusiness(prev => prev ? { ...prev, ...data } : null);
-    } catch (error) {
-      console.error("Update business error:", error);
-      throw error;
-    }
+    setBusiness(prev => prev ? { ...prev, ...data } : null);
   };
 
+  const refreshProfile = async () => {};
+
   const completeOnboarding = async (data: OnboardingData): Promise<BusinessProfile> => {
-    if (!user || !profile) throw new Error("No user logged in");
-
-    const newBusiness = await createBusiness(user.uid, data);
-
+    const newBusiness = createDefaultBusinessProfile("local-user", data);
     setBusiness(newBusiness);
     setProfile(prev => prev ? { ...prev, businessId: newBusiness.id, onboardingComplete: true } : null);
-
     return newBusiness;
   };
 
   return (
     <AuthContext.Provider value={{
-      user,
+      user: MOCK_USER,
       profile,
       business,
-      loading,
-      signInWithGoogle,
-      signInWithEmail,
-      signUpWithEmail,
-      sendOTP,
-      verifyOTP,
-      resetPassword,
-      logout,
+      loading: false,
+      signInWithGoogle: async () => {},
+      signInWithEmail: async () => {},
+      signUpWithEmail: async () => {},
+      sendOTP: async () => {},
+      verifyOTP: async () => true,
+      resetPassword: async () => {},
+      logout: async () => {},
       updateProfile,
       updateBusiness,
       refreshProfile,

@@ -68,7 +68,6 @@ const SETTINGS_SECTIONS: SettingSection[] = [
   { id: "notifications", label: "Notifications", icon: Bell, description: "Email, push, and in-app preferences" },
   { id: "appearance", label: "Appearance", icon: Palette, description: "Theme, density, and display options" },
   { id: "billing", label: "Billing", icon: CreditCard, description: "Plan, payment method, and invoices" },
-  { id: "security", label: "Security", icon: Lock, description: "Password, 2FA, and session management" },
   { id: "api", label: "API Keys", icon: KeyIcon, description: "Developer keys and webhook endpoints" },
 ];
 
@@ -226,23 +225,6 @@ export default function Settings() {
     pricePerSeat: 0,
   });
 
-  interface Security {
-    twoFA: boolean;
-    sessions: Array<{
-      device: string;
-      location: string;
-      current: boolean;
-      lastActive: string;
-    }>;
-  }
-
-  const [security, setSecurity] = useState<Security>({
-    twoFA: false,
-    sessions: [
-      { device: "Current browser", location: "Current location", current: true, lastActive: "Now" },
-    ],
-  });
-
   interface ApiKey {
     id: string;
     name: string;
@@ -327,7 +309,6 @@ export default function Settings() {
           {active === "notifications" && <NotificationsSection notifications={notifications} setNotifications={setNotifications} />}
           {active === "appearance" && <AppearanceSection appearance={appearance} setAppearance={setAppearance} />}
           {active === "billing" && <BillingSection billing={billing} />}
-          {active === "security" && <SecuritySection security={security} />}
           {active === "api" && <APIKeysSection apiKeys={apiKeys} setApiKeys={setApiKeys} />}
         </div>
       </div>
@@ -912,60 +893,6 @@ function BillingSection({ billing }: { billing: any }) {
         <div className="mt-6 pt-4 border-t border-white/10">
           <Button variant="secondary">Update payment method</Button>
           <Button variant="ghost" className="ml-2">View invoices</Button>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
-
-function SecuritySection({ security }: { security: any }) {
-  return (
-    <div className="space-y-4">
-      <GlassCard className="p-6">
-        <h3 className="text-[15px] font-semibold text-white">Two-Factor Authentication</h3>
-        <p className="mt-0.5 text-[12.5px] text-ink-400">Add an extra layer of security to your account.</p>
-        <div className="mt-4 flex items-center justify-between p-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">
-          <div>
-            <div className="font-medium text-white">Authenticator App</div>
-            <div className="text-[12px] text-ink-400">Enabled • Last used 2 hours ago</div>
-          </div>
-          <Badge tone="emerald" dot>Active</Badge>
-        </div>
-        <div className="mt-3 flex gap-2">
-          <Button variant="secondary">Regenerate backup codes</Button>
-          <Button variant="ghost">Disable 2FA</Button>
-        </div>
-      </GlassCard>
-
-      <GlassCard className="p-6">
-        <h3 className="text-[15px] font-semibold text-white">Active Sessions</h3>
-        <p className="mt-0.5 text-[12.5px] text-ink-400">Manage devices logged into your account.</p>
-        <div className="mt-4 divide-y divide-white/5">
-          {security.sessions.map((s: { device: string; location: string; current: boolean; lastActive: string }, i: number) => (
-            <div key={i} className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.04]">
-                  <MonitorIcon className="h-4.5 w-4.5 text-ink-400" />
-                </div>
-                <div>
-                  <div className="font-medium text-white">{s.device}</div>
-                  <div className="text-[11.5px] text-ink-400">{s.location} • {s.lastActive}</div>
-                </div>
-                {s.current && <Badge tone="brand" size="xs">Current</Badge>}
-              </div>
-              {!s.current && <Button size="xs" variant="ghost" className="text-rose-300 hover:text-rose-100">Revoke</Button>}
-            </div>
-          ))}
-        </div>
-        <div className="mt-4">
-          <Button variant="secondary">Revoke all other sessions</Button>
-        </div>
-      </GlassCard>
-
-      <GlassCard className="p-6">
-        <h3 className="text-[15px] font-semibold text-white">Password</h3>
-        <div className="mt-4">
-          <Button variant="secondary">Change password</Button>
         </div>
       </GlassCard>
     </div>

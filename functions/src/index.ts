@@ -119,11 +119,6 @@ export const onUserDelete = functions.auth.user().onDelete(async (user) => {
 // ============================================
 
 export const discoverBusiness = functions.https.onCall(async (data, context) => {
-  // Verify auth
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  }
-
   const { phone, businessName, address } = BusinessDiscoverySchema.parse(data);
   
   const results = await Promise.allSettled([
@@ -273,10 +268,6 @@ function aggregateDiscoveryResults(results: PromiseSettledResult<any>[]) {
 // ============================================
 
 export const createBusiness = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  }
-
   const validated = CreateBusinessSchema.parse(data);
   
   const businessId = `biz_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -285,7 +276,7 @@ export const createBusiness = functions.https.onCall(async (data, context) => {
     id: businessId,
     name: validated.businessName,
     type: validated.businessType,
-    ownerId: context.auth.uid,
+    ownerId: "local-user",
     phone: validated.phone,
     address: validated.address,
     currency: validated.currency,
@@ -307,7 +298,7 @@ export const createBusiness = functions.https.onCall(async (data, context) => {
       },
       autoInvoice: true,
       taxRate: 18,
-      currencyFormat: "₹",
+      currencyFormat: "\u20B9",
     },
     integrations: {},
     departments: validated.departments,
@@ -318,7 +309,7 @@ export const createBusiness = functions.https.onCall(async (data, context) => {
   await db.collection("businesses").doc(businessId).set(business);
   
   // Update user profile with business ID
-  await db.collection("users").doc(context.auth.uid).update({
+  await db.collection("users").doc("local-user").update({
     businessId,
     onboardingComplete: true,
     onboardingStep: 10,
@@ -362,10 +353,6 @@ async function createDepartment(businessId: string, type: string): Promise<strin
 // ============================================
 
 export const createRazorpayOrder = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  }
-
   const validated = CreateOrderSchema.parse(data);
   
   const order = await razorpay.orders.create({
@@ -384,10 +371,6 @@ export const createRazorpayOrder = functions.https.onCall(async (data, context) 
 });
 
 export const verifyRazorpayPayment = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  }
-
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = data;
   
   const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -415,10 +398,6 @@ export const verifyRazorpayPayment = functions.https.onCall(async (data, context
 });
 
 export const createStripePaymentIntent = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  }
-
   const { amount, currency = "usd", metadata } = data;
   
   const paymentIntent = await stripe.paymentIntents.create({
@@ -563,16 +542,11 @@ async function handleStripePaymentFailed(paymentIntent: any) {
 // ============================================
 
 export const syncShopify = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  }
-
   const { businessId, storeDomain, accessToken } = data;
   
-  // Verify ownership
   const bizDoc = await db.collection("businesses").doc(businessId).get();
-  if (!bizDoc.exists || bizDoc.data()?.ownerId !== context.auth.uid) {
-    throw new functions.https.HttpsError("permission-denied", "Not authorized");
+  if (!bizDoc.exists) {
+    throw new functions.https.HttpsError("not-found", "Business not found");
   }
 
   const shopify = axios.create({
@@ -642,14 +616,11 @@ export const syncShopify = functions.https.onCall(async (data, context) => {
 // ============================================
 
 export const executeAgentTask = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  
   const { taskId, businessId, agentType, input } = data;
   
-  // Verify access
   const bizDoc = await db.collection("businesses").doc(businessId).get();
-  if (!bizDoc.exists || bizDoc.data()?.ownerId !== context.auth.uid) {
-    throw new functions.https.HttpsError("permission-denied", "Not authorized");
+  if (!bizDoc.exists) {
+    throw new functions.https.HttpsError("not-found", "Business not found");
   }
 
   const taskRef = db.collection("businesses").doc(businessId).collection("tasks").doc(taskId);

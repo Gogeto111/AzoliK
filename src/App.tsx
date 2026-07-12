@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useNavigate, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { AIProvider } from "@/lib/aiStore";
 import { CommandPalette } from "@/components/os/CommandPalette";
@@ -7,51 +7,25 @@ import { DepartmentActivation } from "@/components/os/DepartmentActivation";
 import { Onboarding } from "@/components/os/Onboarding";
 import { AssignWork as AssignWorkFAB } from "@/components/os/AssignWork";
 import { LandingPage } from "@/pages/LandingPage";
-import { AuthPage } from "@/pages/AuthPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import Dashboard from "@/pages/Dashboard";
 import Departments from "@/pages/Departments";
 import Inbox from "@/pages/Inbox";
 import Automation from "@/pages/Automation";
 import Analytics from "@/pages/Analytics";
-import { useAuth } from "@/contexts/AuthContext";
-
-function ProtectedRoute() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-          <span className="text-[13px] text-ink-400">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <Outlet />;
-}
 
 function AppRoutes() {
   const navigate = useNavigate();
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route path="/" element={<LandingPage onGetStarted={() => navigate("/auth")} />} />
-        <Route path="/auth" element={<AuthPage onComplete={() => navigate("/onboarding")} />} />
+        <Route path="/" element={<LandingPage onGetStarted={() => navigate("/dashboard")} />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/departments" element={<Departments />} />
-          <Route path="/inbox" element={<Inbox />} />
-          <Route path="/automation" element={<Automation />} />
-          <Route path="/analytics" element={<Analytics />} />
-        </Route>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/departments" element={<Departments />} />
+        <Route path="/inbox" element={<Inbox />} />
+        <Route path="/automation" element={<Automation />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

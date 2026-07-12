@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { cn } from "@/lib/utils";
-import { auth, db, doc, getDoc, updateDoc } from "@/lib/firebase";
+import { db, doc, getDoc, updateDoc } from "@/lib/firebase";
 
 interface IntegrationConfig {
   connected: boolean;
@@ -242,10 +242,9 @@ export function IntegrationsScreen({ onComplete, onBack }: IntegrationsScreenPro
   }, []);
 
   const loadConnectedIntegrations = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
+    const userUid = "local-user";
 
-    const userSnap = await getDoc(doc(db, "users", user.uid));
+    const userSnap = await getDoc(doc(db, "users", userUid));
     if (!userSnap.exists()) return;
 
     const businessId = userSnap.data().businessId;
@@ -261,10 +260,9 @@ export function IntegrationsScreen({ onComplete, onBack }: IntegrationsScreenPro
   };
 
   const saveIntegrationConfig = async (integrationId: string, config: IntegrationConfig) => {
-    const user = auth.currentUser;
-    if (!user) return;
+    const userUid = "local-user";
 
-    const userSnap = await getDoc(doc(db, "users", user.uid));
+    const userSnap = await getDoc(doc(db, "users", userUid));
     if (!userSnap.exists()) return;
 
     const businessId = userSnap.data().businessId;

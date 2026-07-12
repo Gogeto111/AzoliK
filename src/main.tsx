@@ -1,4 +1,4 @@
-import { StrictMode, useState, useEffect, Component, type ReactNode } from "react";
+import { StrictMode, useState, Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
