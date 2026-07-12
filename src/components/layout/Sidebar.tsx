@@ -5,56 +5,32 @@ import {
   LayoutDashboard,
   Building2,
   Workflow,
-  Blocks,
   BarChart3,
-  Store,
-  Settings as SettingsIcon,
   Sparkles,
   MessageSquare,
-  Bot,
-  BookOpen,
-  Activity,
-  Brain,
-  Search,
-  Command,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { IconButton } from "@/components/ui/IconButton";
-import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
-import { useAI } from "@/lib/aiStore";
-import { useAuth } from "@/contexts/AuthContext";
 
 type NavItem = {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   badge?: { label: string; tone: "brand" | "emerald" | "muted" | "amber"; dot?: boolean };
-  comingSoon?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/departments", label: "Departments", icon: Building2 },
-  { to: "/inbox", label: "Inbox", icon: MessageSquare, badge: { label: "New", tone: "emerald", dot: true } },
+  { to: "/inbox", label: "Inbox", icon: MessageSquare, badge: { label: "Live", tone: "emerald", dot: true } },
   { to: "/automation", label: "Automation", icon: Workflow, badge: { label: "Live", tone: "emerald", dot: true } },
-  { to: "/integrations", label: "Integrations", icon: Blocks },
-  { to: "/knowledge", label: "Knowledge", icon: BookOpen },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/workforce", label: "AI Workforce", icon: Bot, badge: { label: "Live", tone: "brand", dot: true } },
-  { to: "/activity", label: "Activity Feed", icon: Activity },
-  { to: "/marketplace", label: "Marketplace", icon: Store, badge: { label: "Soon", tone: "muted" }, comingSoon: true },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export function Sidebar({ className }: { className?: string }) {
   const location = useLocation();
   const prefersReduced = useReducedMotion();
-  const ai = useAI();
-  const { profile, business, logout } = useAuth();
-  const displayName = profile?.displayName || "User";
-  const email = profile?.email || "";
-  const businessName = business?.name || "My Workspace";
+
   return (
     <aside
       className={cn(
@@ -67,7 +43,7 @@ export function Sidebar({ className }: { className?: string }) {
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.12 }}
-        className="flex items-center gap-3 px-2 pb-4"
+        className="flex items-center gap-3 px-2 pb-6"
       >
         <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#8faeff] via-brand-500 to-brand-700 shadow-[0_8px_24px_-6px_rgba(59,91,255,0.6),inset_0_1px_0_rgba(255,255,255,0.3)]">
           <Sparkles className="h-[18px] w-[18px] text-white" strokeWidth={2.4} />
@@ -83,79 +59,33 @@ export function Sidebar({ className }: { className?: string }) {
             Azolik
           </span>
           <span className="text-[10px] font-medium italic text-ink-400">
-            Most AIs work with you.
-          </span>
-          <span className="text-[10px] font-medium text-brand-300 -mt-0.5">
-            Azolik works for you.
+            AI Departments
           </span>
         </div>
       </motion.div>
 
-      {/* Workspace Switcher */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.18 }}
-        className="px-1 pb-2.5"
-      >
-        <button className="group glass flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-all hover:bg-white/[0.04]">
-          <Avatar name={businessName} tone="violet" size="sm" />
-          <div className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-[12.5px] font-medium text-white">
-              {businessName}
-            </span>
-            <span className="text-[10.5px] text-ink-400">{business ? "Active" : "No business"}</span>
-          </div>
-          <ChevronSelector className="h-3.5 w-3.5 text-ink-500 transition-transform group-hover:translate-y-0.5" />
-        </button>
-      </motion.div>
-
-      {/* AI search */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.24 }}
-        className="px-1 pb-3"
-      >
-        <button
-          onClick={() => ai.dispatch({ type: "TOGGLE_COMMAND" })}
-          className="group flex w-full items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left transition-all hover:border-white/10 hover:bg-white/[0.04]"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-brand-300" />
-          <span className="flex-1 text-[12.5px] text-ink-300 group-hover:text-ink-200">
-            Ask Azolik or search…
-          </span>
-          <span className="hidden items-center gap-0.5 text-[10px] text-ink-500 sm:flex">
-            <kbd className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5">⌘K</kbd>
-          </span>
-        </button>
-      </motion.div>
-
       {/* Nav */}
-      <nav className="mt-1 flex-1 space-y-0.5 overflow-y-auto px-1 pr-0.5">
-        <div className="mb-1 px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-500">
-          Workspace
+      <nav className="flex-1 space-y-0.5 px-1">
+        <div className="mb-1 px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+          Navigation
         </div>
         {NAV_ITEMS.map((item, i) => {
           const Icon = item.icon;
           const isActive =
-            item.to === "/"
-              ? location.pathname === "/"
+            item.to === "/dashboard"
+              ? location.pathname === "/dashboard" || location.pathname === "/"
               : location.pathname.startsWith(item.to);
           return (
             <motion.div
               key={item.to}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.3 + i * 0.03 }}
+              transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.2 + i * 0.04 }}
             >
               <NavLink
-                to={item.comingSoon ? "#" : item.to}
-                onClick={(e) => {
-                  if (item.comingSoon) e.preventDefault();
-                }}
+                to={item.to}
                 className={cn(
-                  "group relative flex items-center gap-3 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-all",
+                  "group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all",
                   isActive
                     ? "text-white"
                     : "text-ink-300 hover:text-white"
@@ -198,49 +128,17 @@ export function Sidebar({ className }: { className?: string }) {
         })}
       </nav>
 
-      {/* User */}
+      {/* Footer */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.6 }}
-        className="mt-1 px-1"
+        transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.5 }}
+        className="mt-auto px-3 pt-4 border-t border-white/[0.06]"
       >
-        <button
-          className="group flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.04]"
-          onClick={() => logout()}
-        >
-          <Avatar name={displayName} tone="brand" size="sm" status="online" />
-          <div className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-[12.5px] font-medium text-white">
-              {displayName}
-            </span>
-            <span className="truncate text-[10.5px] text-ink-400">
-              {email}
-            </span>
-          </div>
-          <IconButton variant="ghost" size="sm" title="Sign out">
-            <DotsVertical className="h-3.5 w-3.5" />
-          </IconButton>
-        </button>
+        <p className="text-[10px] text-ink-500 text-center">
+          Demo Mode — Live Judging
+        </p>
       </motion.div>
     </aside>
-  );
-}
-
-function ChevronSelector({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="m7 15 5 5 5-5" />
-      <path d="m7 9 5-5 5 5" />
-    </svg>
-  );
-}
-function DotsVertical({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="5" r="1" />
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="12" cy="19" r="1" />
-    </svg>
   );
 }

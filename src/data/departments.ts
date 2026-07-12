@@ -6,58 +6,7 @@ import {
   Calculator,
   Users,
 } from "lucide-react";
-import type { DepartmentConfig, DepartmentId, ToolId } from "@/types";
-
-export const DEPARTMENT_TOOLS: Record<DepartmentId, { id: ToolId; name: string; description: string; icon: string }[]> = {
-  support: [
-    { id: "whatsapp", name: "WhatsApp Business", description: "Send & reply to customer messages", icon: "💬" },
-    { id: "faqs", name: "Search FAQs", description: "Search knowledge base instantly", icon: "📚" },
-    { id: "inventory", name: "Check Inventory", description: "Real-time product availability", icon: "📦" },
-    { id: "orders", name: "Track Orders", description: "Check order status & shipping", icon: "🚚" },
-    { id: "calendar_book", name: "Book Appointments", description: "Schedule calls & meetings", icon: "📅" },
-    { id: "gmail", name: "Send Emails", description: "Reply via email when needed", icon: "✉️" },
-  ],
-  sales: [
-    { id: "crm", name: "Update CRM", description: "Log deals & update stages", icon: "🎯" },
-    { id: "gmail", name: "Send Follow-ups", description: "Personalized outreach emails", icon: "✉️" },
-    { id: "payments", name: "Generate Payment Links", description: "Create Razorpay/Stripe links", icon: "💳" },
-    { id: "calendar", name: "Schedule Meetings", description: "Book calls with leads", icon: "📅" },
-    { id: "hubspot", name: "HubSpot Sync", description: "Sync leads & pipeline", icon: "🔄" },
-    { id: "zoho", name: "Zoho CRM", description: "Update contact records", icon: "📊" },
-  ],
-  marketing: [
-    { id: "social", name: "Create Social Posts", description: "Generate content for Instagram, LinkedIn, X", icon: "📱" },
-    { id: "email_marketing", name: "Create Emails", description: "Campaign emails & newsletters", icon: "✉️" },
-    { id: "calendar", name: "Schedule Campaigns", description: "Plan & schedule posts", icon: "📅" },
-    { id: "slack", name: "Slack Notifications", description: "Alert team on approvals", icon: "💬" },
-    { id: "notion", name: "Content Calendar", description: "Save to Notion database", icon: "📝" },
-    { id: "shopify", name: "Promo Products", description: "Create discount campaigns", icon: "🛍️" },
-  ],
-  finance: [
-    { id: "gmail", name: "Read Bills", description: "Parse incoming invoices from email", icon: "📧" },
-    { id: "sheets", name: "Update Google Sheets", description: "Log expenses & revenue", icon: "📊" },
-    { id: "invoices", name: "Send Invoices", description: "Generate & send GST invoices", icon: "🧾" },
-    { id: "expenses", name: "Track Expenses", description: "Categorize & flag anomalies", icon: "💸" },
-    { id: "razorpay", name: "Razorpay", description: "Verify payments & payouts", icon: "💳" },
-    { id: "stripe", name: "Stripe", description: "Process subscriptions", icon: "🃏" },
-  ],
-  operations: [
-    { id: "inventory", name: "Update Inventory", description: "Sync stock across channels", icon: "📦" },
-    { id: "orders", name: "Manage Orders", description: "Process, ship & track", icon: "🚚" },
-    { id: "shopify", name: "Shopify Sync", description: "Update products & stock", icon: "🛍️" },
-    { id: "woo", name: "WooCommerce", description: "Sync e-commerce data", icon: "🏪" },
-    { id: "slack", name: "Team Coordination", description: "Notify & coordinate teams", icon: "💬" },
-    { id: "notion", name: "Task Logs", description: "Record decisions in Notion", icon: "📝" },
-  ],
-  hr: [
-    { id: "gmail", name: "Send Emails", description: "Candidate & employee comms", icon: "✉️" },
-    { id: "calendar", name: "Schedule Interviews", description: "Book interview slots", icon: "📅" },
-    { id: "sheets", name: "Track Candidates", description: "Update hiring pipeline", icon: "📊" },
-    { id: "slack", name: "Slack Alerts", description: "Notify hiring managers", icon: "💬" },
-    { id: "notion", name: "Onboarding Docs", description: "Create docs for new hires", icon: "📝" },
-    { id: "outlook", name: "Outlook Calendar", description: "Cross-platform scheduling", icon: "📆" },
-  ],
-};
+import type { DepartmentConfig, ToolId } from "@/types";
 
 export const DEPARTMENTS: DepartmentConfig[] = [
   {
@@ -75,7 +24,7 @@ export const DEPARTMENTS: DepartmentConfig[] = [
       text: "text-cyan-200",
       glow: "rgba(34,211,238,0.5)",
     },
-    tools: DEPARTMENT_TOOLS.support.map((t) => t.id),
+    tools: ["whatsapp", "faqs", "inventory", "orders", "calendar_book", "gmail"] as ToolId[],
     agents: [
       { id: "s1", name: "Inbox Resolver", role: "Tier-1 Support Agent", avatar: "IR", status: "active", tasksCompleted: 8421, successRate: 98 },
       { id: "s2", name: "Order Tracker", role: "Logistics Specialist", avatar: "OT", status: "active", tasksCompleted: 4321, successRate: 99 },
@@ -104,7 +53,7 @@ export const DEPARTMENTS: DepartmentConfig[] = [
       text: "text-emerald-200",
       glow: "rgba(52,211,153,0.5)",
     },
-    tools: DEPARTMENT_TOOLS.sales.map((t) => t.id),
+    tools: ["crm", "gmail", "payments", "calendar", "hubspot", "zoho"] as ToolId[],
     agents: [
       { id: "sa1", name: "Lead Qualifier", role: "Inbound SDR", avatar: "LQ", status: "active", tasksCompleted: 2142, successRate: 92 },
       { id: "sa2", name: "Deal Desk", role: "Quote & Contract Lead", avatar: "DD", status: "active", tasksCompleted: 841, successRate: 96 },
@@ -132,7 +81,7 @@ export const DEPARTMENTS: DepartmentConfig[] = [
       text: "text-violet-200",
       glow: "rgba(167,139,250,0.5)",
     },
-    tools: DEPARTMENT_TOOLS.marketing.map((t) => t.id),
+    tools: ["social", "email_marketing", "calendar", "slack", "notion", "shopify"] as ToolId[],
     agents: [
       { id: "m1", name: "Brief Writer", role: "Content Strategist", avatar: "BW", status: "active", tasksCompleted: 621, successRate: 94 },
       { id: "m2", name: "Campaign Runner", role: "Paid & Scheduled Ads", avatar: "CR", status: "training", tasksCompleted: 189, successRate: 88 },
@@ -159,7 +108,7 @@ export const DEPARTMENTS: DepartmentConfig[] = [
       text: "text-rose-200",
       glow: "rgba(251,113,133,0.5)",
     },
-    tools: DEPARTMENT_TOOLS.finance.map((t) => t.id),
+    tools: ["gmail", "sheets", "invoices", "expenses", "razorpay", "stripe"] as ToolId[],
     agents: [
       { id: "f1", name: "Invoice Matcher", role: "AP/AR Reconciliation", avatar: "IM", status: "active", tasksCompleted: 1242, successRate: 99 },
       { id: "f2", name: "Expense Auditor", role: "Anomaly Detection", avatar: "EA", status: "active", tasksCompleted: 421, successRate: 97 },
@@ -186,7 +135,7 @@ export const DEPARTMENTS: DepartmentConfig[] = [
       text: "text-amber-200",
       glow: "rgba(251,191,36,0.5)",
     },
-    tools: DEPARTMENT_TOOLS.operations.map((t) => t.id),
+    tools: ["inventory", "orders", "shopify", "woo", "slack", "notion"] as ToolId[],
     agents: [
       { id: "o1", name: "Stock Keeper", role: "Inventory Sync Lead", avatar: "SK", status: "active", tasksCompleted: 2142, successRate: 99 },
       { id: "o2", name: "Order Router", role: "Fulfillment Coordinator", avatar: "OR", status: "active", tasksCompleted: 4321, successRate: 98 },
@@ -214,7 +163,7 @@ export const DEPARTMENTS: DepartmentConfig[] = [
       text: "text-brand-200",
       glow: "rgba(143,174,255,0.5)",
     },
-    tools: DEPARTMENT_TOOLS.hr.map((t) => t.id),
+    tools: ["gmail", "calendar", "sheets", "slack", "notion", "outlook"] as ToolId[],
     agents: [
       { id: "h1", name: "Resume Screener", role: "Candidate Screening", avatar: "RS", status: "idle", tasksCompleted: 248, successRate: 93 },
       { id: "h2", name: "Onboarding Buddy", role: "New Hire Experience", avatar: "OB", status: "active", tasksCompleted: 42, successRate: 100 },
@@ -227,7 +176,6 @@ export const DEPARTMENTS: DepartmentConfig[] = [
   },
 ];
 
-// Memory seeds (simulated business memory)
 export const INITIAL_MEMORY = [
   { type: "policy", key: "Returns: 7 days for unused items", source: "operations", confidence: 1 },
   { type: "policy", key: "Free shipping above ₹999", source: "operations", confidence: 1 },
@@ -238,33 +186,4 @@ export const INITIAL_MEMORY = [
   { type: "preference", key: "Brand voice: warm, concise, no jargon", source: "marketing", confidence: 1 },
   { type: "policy", key: "Working hours: Mon-Sat 10am-7pm IST", source: "hr", confidence: 1 },
   { type: "conversation", key: "Elena Rossi approved Q3 campaign budget", source: "marketing", confidence: 0.95 },
-];
-
-// Tool catalog (all available integrations) — brand icons not present in this
-// lucide-react build are represented via a small branded letter component.
-import {
-  MessageCircle, Mail, Table, CalendarDays, ShoppingBag, ShoppingCart,
-  CreditCard, FileText, Target, Grid3X3, Briefcase,
-} from "lucide-react";
-import { makeBrandBadge } from "@/components/ui/BrandBadge";
-
-const SlackIcon = makeBrandBadge("Sl");
-const DiscordIcon = makeBrandBadge("Di");
-const StripeIcon = makeBrandBadge("St");
-
-export const INTEGRATION_CATALOG = [
-  { id: "whatsapp", name: "WhatsApp Business", icon: MessageCircle, category: "communication", color: "#25D366", description: "Send & receive customer messages" },
-  { id: "gmail", name: "Gmail", icon: Mail, category: "communication", color: "#EA4335", description: "Email & threads" },
-  { id: "outlook", name: "Microsoft Outlook", icon: Briefcase, category: "communication", color: "#0078D4", description: "Calendar & email" },
-  { id: "slack", name: "Slack", icon: SlackIcon, category: "communication", color: "#E01E5A", description: "Team notifications" },
-  { id: "discord", name: "Discord", icon: DiscordIcon, category: "communication", color: "#5865F2", description: "Community & alerts" },
-  { id: "sheets", name: "Google Sheets", icon: Table, category: "productivity", color: "#34A853", description: "Data & reports" },
-  { id: "notion", name: "Notion", icon: FileText, category: "productivity", color: "#ffffff", description: "Docs & databases" },
-  { id: "calendar", name: "Google Calendar", icon: CalendarDays, category: "productivity", color: "#4285F4", description: "Meetings & scheduling" },
-  { id: "shopify", name: "Shopify", icon: ShoppingBag, category: "ecommerce", color: "#96BF48", description: "Products & orders" },
-  { id: "woo", name: "WooCommerce", icon: ShoppingCart, category: "ecommerce", color: "#7F54B3", description: "WordPress store" },
-  { id: "razorpay", name: "Razorpay", icon: CreditCard, category: "payments", color: "#0F2683", description: "Indian payments" },
-  { id: "stripe", name: "Stripe", icon: StripeIcon, category: "payments", color: "#635BFF", description: "Global payments" },
-  { id: "hubspot", name: "HubSpot CRM", icon: Target, category: "crm", color: "#FF7A59", description: "Inbound & pipeline" },
-  { id: "zoho", name: "Zoho CRM", icon: Grid3X3, category: "crm", color: "#E42528", description: "Sales CRM" },
 ];

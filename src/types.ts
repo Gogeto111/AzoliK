@@ -1,7 +1,3 @@
-// ============================================================
-// Azolik Core Types — Real AI Workforce Platform
-// ============================================================
-
 export type DepartmentId = "support" | "sales" | "marketing" | "operations" | "finance" | "hr";
 
 export type ToolId =
@@ -59,7 +55,7 @@ export type Task = {
   completedAt?: number;
   toolCalls: string[];
   handoffs: string[];
-  assignee: string; // agent name
+  assignee: string;
 };
 
 export type DepartmentAgent = {
@@ -80,7 +76,7 @@ export type DepartmentConfig = {
   systemPrompt: string;
   personName?: string;
   personRole?: string;
-  icon: any; // lucide icon
+  icon: any;
   color: {
     primary: string;
     bg: string;
@@ -107,31 +103,6 @@ export type DepartmentConfig = {
   onlineSince?: number;
 };
 
-export type WorkforceMetrics = {
-  departmentsOnline: number;
-  agentsWorking: number;
-  tasksRunning: number;
-  revenueGenerated: number;
-  leadsClosed: number;
-  customersHelped: number;
-  hoursSaved: number;
-  automationsCompleted: number;
-  healthScore: number;
-};
-
-export type BusinessProfile = {
-  name: string;
-  owner: string;
-  industry: string;
-  size: string;
-  founded: number;
-  language: string;
-  currency: string;
-  timezone: string;
-  products: number;
-  employees: number;
-};
-
 export type TimelineEvent = {
   id: string;
   type: "tool_call" | "handoff" | "task_completed" | "decision" | "error" | "memory_update" | "integration_sync";
@@ -141,19 +112,4 @@ export type TimelineEvent = {
   timestamp: number;
   status: "running" | "success" | "warning" | "error" | "info";
   metadata?: Record<string, unknown>;
-};
-
-export type IntegrationConfig = {
-  id: ToolId;
-  name: string;
-  description: string;
-  icon: any;
-  category: "communication" | "crm" | "payments" | "productivity" | "ecommerce" | "marketing";
-  connected: boolean;
-  account?: string;
-  permissions: string[];
-  lastSync?: number;
-  health: "healthy" | "degraded" | "error" | "disconnected";
-  recentActivity: { event: string; timestamp: number }[];
-  color: string;
 };
