@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { sb, type BusinessProfile, type Department, type Task, type Conversation } from "@/lib/supabase";
+import { db, collection, query, where, orderBy, limit as fsLimit, getDocs } from "@/lib/firebase";
+import type { BusinessProfile, Department, Task, Conversation } from "@/lib/firebase";
 import { useEngine, useEngineStart } from "@/lib/engine";
 import { DEPARTMENTS } from "@/data/departments";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -78,7 +79,7 @@ function formatTimeAgo(ts: number): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-/* ── Supabase data hook (kept for real business data) ─────────── */
+/* ── Firestore data hook ────────────────────────────────────── */
 
 interface DashboardData {
   business: BusinessProfile | null;
@@ -123,55 +124,45 @@ export function useDashboardData(): DashboardData {
     }
 
     try {
-      const [
-        { data: departments },
-        { data: tasks },
-        { data: conversations },
-        { data: analytics },
-        { data: invoices },
-        { data: leads },
-      ] = await Promise.all([
-        sb
-          .from("departments")
-          .select("*")
-          .eq("business_id", business.id),
-        sb
-          .from("tasks")
-          .select("*")
-          .eq("business_id", business.id)
-          .in("status", ["pending", "in_progress", "waiting_approval"])
-          .order("created_at", { ascending: false })
-          .limit(20),
-        sb
-          .from("conversations")
-          .select("*")
-          .eq("business_id", business.id)
-          .eq("status", "open")
-          .order("last_message_at", { ascending: false })
-          .limit(10),
-        sb
-          .from("analytics_daily")
-          .select("*")
-          .eq("business_id", business.id)
-          .order("date", { ascending: false })
-          .limit(1),
-        sb
-          .from("invoices")
-          .select("total, status")
-          .eq("business_id", business.id),
-        sb
-          .from("leads")
-          .select("id, status")
-          .eq("business_id", business.id),
-      ]);
+      const [deptSnap, taskSnap, convSnap, invoiceSnap, leadSnap] =
+        await Promise.all([
+          getDocs(
+            query(collection(db, "businesses", business.id, "departments"))
+          ),
+          getDocs(
+            query(
+              collection(db, "businesses", business.id, "tasks"),
+              where("status", "in", ["pending", "in_progress", "waiting_approval"]),
+              orderBy("createdAt", "desc"),
+              fsLimit(20)
+            )
+          ),
+          getDocs(
+            query(
+              collection(db, "businesses", business.id, "conversations"),
+              where("status", "==", "open"),
+              orderBy("lastMessageAt", "desc"),
+              fsLimit(10)
+            )
+          ),
+          getDocs(
+            query(collection(db, "businesses", business.id, "invoices"))
+          ),
+          getDocs(
+            query(collection(db, "businesses", business.id, "leads"))
+          ),
+        ]);
 
-      const today = new Date().toISOString().split("T")[0];
-      const todayAnalytics =
-        analytics?.find((a: any) => a.date === today) || analytics?.[0];
+      const departments = deptSnap.docs.map((d) => d.data() as Department);
+      const tasks = taskSnap.docs.map((t) => t.data() as Task);
+      const conversations = convSnap.docs.map((c) => c.data() as Conversation);
+      const invoices = invoiceSnap.docs.map((i) => i.data() as any);
+      const leads = leadSnap.docs.map((l) => l.data() as any);
 
-      const depts = departments || [];
-      const activeTasks = tasks || [];
-      const openConversations = conversations || [];
+      const todayAnalytics: any = undefined;
+
+      const activeTasks = tasks;
+      const openConversations = conversations;
 
       const revenueAssisted =
         invoices?.reduce(
@@ -185,10 +176,10 @@ export function useDashboardData(): DashboardData {
       const ordersClosed =
         invoices?.filter((inv: any) => inv.status === "paid").length || 0;
       const hoursSaved =
-        todayAnalytics?.hours_saved ||
-        depts.reduce(
+        todayAnalytics?.hoursSaved ||
+        departments.reduce(
           (sum: number, d: any) =>
-            sum + (d.stats?.completed_today || 0) * 0.25,
+            sum + (d.stats?.completedToday || 0) * 0.25,
           0
         );
 
@@ -201,18 +192,18 @@ export function useDashboardData(): DashboardData {
             severity: "warn" as const,
             title: "Approval Needed",
             detail: t.title,
-            at: new Date(t.created_at).getTime(),
+            at: new Date(t.createdAt).getTime(),
             kind: "approval",
           })),
         ...openConversations
-          .filter((c: any) => c.unread_count > 0)
+          .filter((c: any) => c.unreadCount > 0)
           .slice(0, 2)
           .map((c: any) => ({
             id: c.id,
             severity: "info" as const,
             title: "New Message",
-            detail: `${c.customer_name}: ${c.last_message?.slice(0, 50)}...`,
-            at: new Date(c.last_message_at).getTime(),
+            detail: `${c.customerName}: ${c.lastMessage?.slice(0, 50)}...`,
+            at: new Date(c.lastMessageAt).getTime(),
             kind: "message",
           })),
       ];
@@ -224,7 +215,7 @@ export function useDashboardData(): DashboardData {
           title: t.title,
           description: `Task in ${t.department} department`,
           department: t.department,
-          at: new Date(t.created_at).getTime(),
+          at: new Date(t.createdAt).getTime(),
           status:
             t.status === "completed"
               ? ("success" as const)
@@ -233,17 +224,17 @@ export function useDashboardData(): DashboardData {
         ...openConversations.slice(0, 3).map((c: any) => ({
           id: c.id,
           type: "inbound" as const,
-          title: `Message from ${c.customer_name}`,
-          description: c.last_message?.slice(0, 100) || "",
+          title: `Message from ${c.customerName}`,
+          description: c.lastMessage?.slice(0, 100) || "",
           department: c.department,
-          at: new Date(c.last_message_at).getTime(),
+          at: new Date(c.lastMessageAt).getTime(),
           status: "info" as const,
         })),
       ].sort((a, b) => b.at - a.at);
 
       setData({
         business,
-        departments: depts,
+        departments,
         metrics: {
           revenueAssisted,
           customersHelped,
@@ -326,7 +317,7 @@ export default function Dashboard() {
             Mission Control
           </h1>
           <p className="mt-1 text-[13px] text-ink-400">
-            {engine.businessName} — Your AI workforce in action
+            {supabase.business?.name || engine.businessName} — Your AI workforce in action
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -681,7 +672,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Recent Inbox (from Supabase) ──────────────────────── */}
+      {/* ── Recent Inbox (from Firestore) ──────────────────────── */}
       {supabase.inbox.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-white">Open Conversations</h2>
@@ -694,14 +685,14 @@ export default function Dashboard() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-white truncate">
-                      {conv.customer_name}
+                      {conv.customerName}
                     </p>
                     <p className="text-[11px] text-ink-400 truncate">
-                      {conv.last_message}
+                      {conv.lastMessage}
                     </p>
                   </div>
                   <span className="text-[10px] text-ink-500 shrink-0">
-                    {new Date(conv.last_message_at).toLocaleTimeString()}
+                    {new Date(conv.lastMessageAt).toLocaleTimeString()}
                   </span>
                 </div>
               </GlassCard>

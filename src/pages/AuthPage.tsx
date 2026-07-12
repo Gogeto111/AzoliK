@@ -148,7 +148,7 @@ export function AuthPage({ onComplete }: { onComplete: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      await updateProfile({ display_name: name.trim() } as Partial<any>);
+      await updateProfile({ displayName: name.trim() } as Partial<any>);
       onComplete();
     } catch (err: any) {
       setError(err.message || "Failed to create account");

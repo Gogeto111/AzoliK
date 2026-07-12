@@ -8,7 +8,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { cn } from "@/lib/utils";
 
 interface BusinessInfoScreenProps {
-  onComplete: () => void;
+  onComplete: (data: Record<string, any>) => void;
   onBack: () => void;
 }
 
@@ -100,7 +100,7 @@ export function BusinessInfoScreen({ onComplete, onBack }: BusinessInfoScreenPro
   const handleNext = useCallback(() => {
     if (currentQuestion.required && !answers[currentQuestion.id]) return;
     if (step === 3) {
-      onComplete();
+      onComplete(answers);
     } else {
       setStep(prev => prev + 1);
     }

@@ -1,6 +1,9 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\src",
+    "\\src\\lib"
   ],
+  "SelectedNode": "\\src\\lib\\supabase.ts",
   "PreviewInSolutionExplorer": false
 }

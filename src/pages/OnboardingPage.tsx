@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, CheckCircle2, Zap, Shield, Brain, Users, Zap as ZapIcon,
@@ -22,6 +23,8 @@ import { KnowledgeScreen } from "@/components/onboarding/screens/KnowledgeScreen
 import { IntegrationsScreen } from "@/components/onboarding/screens/IntegrationsScreen";
 import { DepartmentsScreen } from "@/components/onboarding/screens/DepartmentsScreen";
 import { LaunchScreen } from "@/components/onboarding/screens/LaunchScreen";
+import { db, collection, setDoc, doc as firestoreDoc } from "@/lib/firebase";
+import type { OnboardingData } from "@/lib/firebase";
 
 const ONBOARDING_STEPS = [
   { id: "welcome", label: "Welcome", icon: Sparkles },
@@ -37,6 +40,7 @@ const ONBOARDING_STEPS = [
 
 export function OnboardingPage() {
   const { user, profile, completeOnboarding } = useAuth();
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<string>("welcome");
   const [onboardingData, setOnboardingData] = useState<Record<string, any>>({});
 
@@ -66,9 +70,56 @@ export function OnboardingPage() {
     }
   }, []);
 
+  const persistKnowledge = async (businessId: string, knowledge: Record<string, any>) => {
+    if (!knowledge || Object.keys(knowledge).length === 0) return;
+    const knowledgeEntries: Array<{ category: string; items: string[] }> = [];
+    for (const [category, items] of Object.entries(knowledge)) {
+      if (Array.isArray(items) && items.length > 0) {
+        knowledgeEntries.push({ category, items: items.filter(Boolean) });
+      }
+    }
+    if (knowledgeEntries.length === 0) return;
+    for (const entry of knowledgeEntries) {
+      const id = `kb_${entry.category}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      await setDoc(firestoreDoc(db, "businesses", businessId, "knowledge", id), {
+        id,
+        businessId,
+        category: entry.category,
+        items: entry.items,
+        createdAt: Date.now(),
+      });
+    }
+  };
+
   const handleCompleteOnboarding = async () => {
     try {
-      const business = await completeOnboarding(onboardingData as any);
+      const discoveryData = onboardingData.discovery || {};
+      const businessInfo = onboardingData.business || {};
+      const selectedDepartments: string[] = onboardingData.departments?.departments
+        || onboardingData.departments
+        || ["support", "sales", "finance"];
+      const selectedIntegrations: string[] = onboardingData.integrations?.integrations
+        || onboardingData.integrations
+        || [];
+
+      const flattenedData: OnboardingData = {
+        businessName: discoveryData.name || businessInfo.businessName || "My Business",
+        businessType: discoveryData.type || businessInfo.businessType || "other",
+        ownerName: profile?.displayName || businessInfo.ownerName || "",
+        phone: discoveryData.phone || businessInfo.phone || "",
+        address: discoveryData.address || "",
+        currency: "INR",
+        timezone: "Asia/Kolkata",
+        departments: Array.isArray(selectedDepartments) ? selectedDepartments : ["support", "sales", "finance"],
+        integrations: Array.isArray(selectedIntegrations) ? selectedIntegrations : [],
+      };
+
+      const business = await completeOnboarding(flattenedData);
+
+      if (onboardingData.knowledge && business?.id) {
+        await persistKnowledge(business.id, onboardingData.knowledge);
+      }
+
       setCurrentStep("complete");
     } catch (error) {
       console.error("Onboarding failed:", error);
@@ -82,9 +133,9 @@ export function OnboardingPage() {
       case "auth":
         return <AuthPage onComplete={() => setCurrentStep("business")} />;
       case "business":
-        return <BusinessInfoScreen onComplete={() => setCurrentStep("discovery")} onBack={() => setCurrentStep("auth")} />;
+        return <BusinessInfoScreen onComplete={(data) => handleStepComplete("business", data)} onBack={() => setCurrentStep("auth")} />;
       case "discovery":
-        return <AIDiscoveryScreen onComplete={() => handleStepComplete("discovery")} onBack={() => setCurrentStep("business")} />;
+        return <AIDiscoveryScreen onComplete={(data) => handleStepComplete("discovery", data)} onBack={() => setCurrentStep("business")} />;
       case "confirm":
         return <ConfirmScreen data={onboardingData.discovery} onComplete={() => setCurrentStep("integrations")} onBack={() => setCurrentStep("discovery")} />;
       case "integrations":
@@ -94,8 +145,10 @@ export function OnboardingPage() {
       case "knowledge":
         return <KnowledgeScreen onComplete={(data) => handleStepComplete("knowledge", data)} onBack={() => setCurrentStep("departments")} />;
       case "launch":
-        const selectedDepartments = onboardingData.departments?.departments || ["support", "sales", "finance"];
-        return <LaunchScreen departments={selectedDepartments} onComplete={handleCompleteOnboarding} />;
+        const selectedDepartments = onboardingData.departments?.departments
+          || onboardingData.departments
+          || ["support", "sales", "finance"];
+        return <LaunchScreen departments={Array.isArray(selectedDepartments) ? selectedDepartments : ["support", "sales", "finance"]} onComplete={handleCompleteOnboarding} />;
       case "complete":
         return (
           <motion.div
@@ -122,11 +175,11 @@ export function OnboardingPage() {
               </p>
               
               <div className="space-y-3">
-                <Button onClick={() => window.location.href = "/dashboard"} className="w-full gap-2">
+                <Button onClick={() => navigate("/dashboard")} className="w-full gap-2">
                   <CheckCircle2 className="h-5 w-5" />
                   Go to Dashboard
                 </Button>
-                <Button variant="ghost" onClick={() => setCurrentStep("welcome")} className="w-full">
+                <Button variant="ghost" onClick={() => navigate("/")} className="w-full">
                   Back to Home
                 </Button>
               </div>

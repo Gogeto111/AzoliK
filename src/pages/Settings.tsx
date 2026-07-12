@@ -42,7 +42,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { sb, IntegrationConfig } from "@/lib/supabase";
+import { db, doc, getDoc, updateDoc } from "@/lib/firebase";
+
+interface IntegrationConfig {
+  connected: boolean;
+  config?: Record<string, any>;
+  last_sync?: string;
+  status: "connected" | "disconnected" | "error";
+}
 
 interface SettingSection {
   id: string;
@@ -117,28 +124,29 @@ const TIMEZONES: Timezone[] = [
 export default function Settings() {
   const [active, setActive] = useState<string>("profile");
   const [saving, setSaving] = useState(false);
+  const { profile: authProfile, business: authBusiness } = useAuth();
 
-  // Profile form state
+  // Profile form state - initialized from auth data
   const [profile, setProfile] = useState({
-    firstName: "Aarish",
-    lastName: "Sharma",
-    email: "aarish@buttercrust.com",
-    role: "Owner & Founder",
-    phone: "+91 98765 43210",
+    firstName: authProfile?.displayName?.split(" ")[0] || "",
+    lastName: authProfile?.displayName?.split(" ").slice(1).join(" ") || "",
+    email: authProfile?.email || "",
+    role: authProfile?.role || "Owner",
+    phone: authProfile?.phoneNumber || "",
     avatar: null as string | null,
   });
 
-  // Business form state
+  // Business form state - initialized from auth data
   const [business, setBusiness] = useState({
-    name: "Butter & Crust Bakery",
-    industry: "bakery",
-    timezone: "Asia/Kolkata",
-    address: "123 Baker Street, Bandra West, Mumbai 400050",
-    phone: "+91 22 2645 1234",
-    website: "https://buttercrust.in",
-    gstin: "27AAAAA0000A1Z5",
+    name: authBusiness?.name || "",
+    industry: authBusiness?.type || "",
+    timezone: authBusiness?.timezone || "Asia/Kolkata",
+    address: authBusiness?.address || "",
+    phone: authBusiness?.phone || "",
+    website: authBusiness?.website || "",
+    gstin: authBusiness?.gstin || "",
     openingHours: "Tue–Sun, 8:00 AM – 10:00 PM",
-    currency: "INR",
+    currency: authBusiness?.currency || "INR",
   });
 
   interface Department {
@@ -210,12 +218,12 @@ export default function Settings() {
   }
 
   const [billing, setBilling] = useState<Billing>({
-    plan: "Pro",
+    plan: "Free",
     status: "active",
-    nextBilling: "2026-08-11",
-    paymentMethod: "•••• 4242",
-    seats: 4,
-    pricePerSeat: 499,
+    nextBilling: "",
+    paymentMethod: "",
+    seats: 1,
+    pricePerSeat: 0,
   });
 
   interface Security {
@@ -229,11 +237,9 @@ export default function Settings() {
   }
 
   const [security, setSecurity] = useState<Security>({
-    twoFA: true,
+    twoFA: false,
     sessions: [
-      { device: "Chrome on Windows", location: "Mumbai, India", current: true, lastActive: "Now" },
-      { device: "Safari on iPhone", location: "Mumbai, India", current: false, lastActive: "2h ago" },
-      { device: "Chrome on Mac", location: "Bangalore, India", current: false, lastActive: "3d ago" },
+      { device: "Current browser", location: "Current location", current: true, lastActive: "Now" },
     ],
   });
 
@@ -246,11 +252,7 @@ export default function Settings() {
     scopes: string[];
   }
 
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([
-    { id: "key_1", name: "Production API", key: "az_live_••••••••••abcd", created: "2026-01-15", lastUsed: "2 min ago", scopes: ["read", "write", "webhooks"] },
-    { id: "key_2", name: "Development", key: "az_test_••••••••••efgh", created: "2026-02-20", lastUsed: "3d ago", scopes: ["read"] },
-    { id: "key_3", name: "Webhook Receiver", key: "az_wh_••••••••••ijkl", created: "2026-03-10", lastUsed: "Never", scopes: ["webhooks"] },
-  ]);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
 
   const handleSave = async (section: string) => {
     setSaving(true);
@@ -317,7 +319,7 @@ function ProfileSection({ profile, setProfile, onSave, saving }: { profile: any;
         <h3 className="text-[15px] font-semibold text-white">Profile</h3>
         <p className="mt-0.5 text-[12.5px] text-ink-400">This information will be shown across your workspace.</p>
         <div className="mt-6 flex items-center gap-5">
-          <Avatar name={`${profile.firstName} ${profile.lastName}`} tone="brand" size="xl" status="online" />
+          <Avatar name={`${profile.firstName} ${profile.lastName}` || "User"} tone="brand" size="xl" status="online" />
           <div className="flex gap-2">
             <Button size="sm" variant="secondary">Upload photo</Button>
             <Button size="sm" variant="ghost">Remove</Button>
@@ -335,34 +337,6 @@ function ProfileSection({ profile, setProfile, onSave, saving }: { profile: any;
           <Button variant="primary" onClick={onSave} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Save changes
           </Button>
-        </div>
-      </GlassCard>
-
-      <GlassCard className="p-6">
-        <h3 className="text-[15px] font-semibold text-white">Connected accounts</h3>
-        <p className="mt-0.5 text-[12.5px] text-ink-400">Sign in faster with your existing accounts.</p>
-        <div className="mt-4 divide-y divide-white/5">
-          {[
-            { name: "Google", email: "aarish@buttercrust.com", connected: true, icon: Mail },
-            { name: "WhatsApp Business", email: "+91 98765 43210", connected: true, icon: MessageSquare },
-            { name: "Slack", email: "buttercrust.slack.com", connected: true, icon: MessageSquare },
-            { name: "GitHub", email: "", connected: false, icon: Globe },
-          ].map((c) => (
-            <div key={c.name} className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-3">
-                <c.icon className="h-5 w-5 text-brand-300" />
-                <div>
-                  <div className="text-[13.5px] font-medium text-white">{c.name}</div>
-                  {c.email && <div className="text-[11.5px] text-ink-400">{c.email}</div>}
-                </div>
-              </div>
-              {c.connected ? (
-                <Badge tone="emerald"><Check className="h-3 w-3" /> Connected</Badge>
-              ) : (
-                <Button size="sm" variant="secondary">Connect</Button>
-              )}
-            </div>
-          ))}
         </div>
       </GlassCard>
     </>
@@ -578,25 +552,22 @@ function IntegrationsSection() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!profile?.business_id) return;
+    if (!profile?.businessId) return;
     (async () => {
-      const { data } = await sb
-        .from("businesses")
-        .select("integrations")
-        .eq("id", profile.business_id)
-        .single();
-      if (data?.integrations) setConnectedIntegrations(data.integrations);
+      const bizSnap = await getDoc(doc(db, "businesses", profile.businessId!));
+      const bizData = bizSnap.data();
+      if (bizData?.integrations) setConnectedIntegrations(bizData.integrations);
       setLoading(false);
     })();
-  }, [profile?.business_id]);
+  }, [profile?.businessId]);
 
   const saveIntegration = async (integrationId: string, config: IntegrationConfig) => {
-    if (!profile?.business_id) return;
+    if (!profile?.businessId) return;
     const updated = { ...connectedIntegrations, [integrationId]: config };
-    await sb
-      .from("businesses")
-      .update({ integrations: updated, updated_at: new Date().toISOString() })
-      .eq("id", profile.business_id);
+    await updateDoc(doc(db, "businesses", profile.businessId), {
+      integrations: updated,
+      updatedAt: Date.now(),
+    });
     setConnectedIntegrations(updated);
   };
 

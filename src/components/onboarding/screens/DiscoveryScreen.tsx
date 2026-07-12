@@ -39,7 +39,7 @@ export function DiscoveryScreen({ onComplete, onBack }: DiscoveryScreenProps) {
     setLoading(true);
     setError(null);
     try {
-      const phone = profile?.phone || user?.phoneNumber;
+      const phone = profile?.phoneNumber || user?.phoneNumber;
       if (phone) {
         const response = await fetch(`https://api.azolik.ai/api/business/discover?phone=${encodeURIComponent(phone)}`);
         if (response.ok) {

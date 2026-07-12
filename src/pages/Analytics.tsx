@@ -10,7 +10,22 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { sb, AnalyticsData, Department } from "@/lib/supabase";
+import { db, collection, query, where, orderBy as fsOrderBy, getDocs } from "@/lib/firebase";
+import type { Department } from "@/lib/firebase";
+
+interface AnalyticsData {
+  date: string;
+  revenueAssisted: number;
+  customersHelped: number;
+  appointmentsBooked: number;
+  ordersClosed: number;
+  hoursSaved: number;
+  messagesAnswered: number;
+  avgResponseTime: number;
+  successRate: number;
+  automationsCompleted: number;
+  departmentStats: Record<string, any>;
+}
 import { cn } from "@/lib/utils";
 import { 
   LineChart as LineChartComp, 
@@ -60,20 +75,14 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
   const fetchAnalytics = async () => {
     if (!businessId) return;
     try {
-      const from = dateRange.from.toISOString().split("T")[0];
-      const to = dateRange.to.toISOString().split("T")[0];
-      
-      const { data, error } = await sb
-        .from("analytics_daily")
-        .select("*")
-        .eq("business_id", businessId)
-        .gte("date", from)
-        .lte("date", to)
-        .order("date", { ascending: true });
-
-      if (!error && data) {
-        setAnalytics(data);
-      }
+      const q = query(
+        collection(db, "analytics_daily"),
+        where("businessId", "==", businessId),
+        fsOrderBy("date", "asc")
+      );
+      const snap = await getDocs(q);
+      const data = snap.docs.map(d => d.data() as AnalyticsData);
+      setAnalytics(data);
     } catch (error) {
       console.error("Analytics fetch error:", error);
     } finally {
@@ -84,14 +93,9 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
   const fetchDepartments = async () => {
     if (!businessId) return;
     try {
-      const { data, error } = await sb
-        .from("departments")
-        .select("*")
-        .eq("business_id", businessId);
-      
-      if (!error && data) {
-        setDepartments(data);
-      }
+      const deptQuery = query(collection(db, "businesses", businessId, "departments"));
+      const snap = await getDocs(deptQuery);
+      setDepartments(snap.docs.map(d => d.data() as Department));
     } catch (error) {
       console.error("Departments fetch error:", error);
     }
@@ -114,15 +118,15 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
     }
 
     return analytics.reduce((acc, day) => ({
-      revenueAssisted: acc.revenueAssisted + (day.revenue_assisted || 0),
-      customersHelped: acc.customersHelped + (day.customers_helped || 0),
-      appointmentsBooked: acc.appointmentsBooked + (day.appointments_booked || 0),
-      ordersClosed: acc.ordersClosed + (day.orders_closed || 0),
-      hoursSaved: acc.hoursSaved + (day.hours_saved || 0),
-      messagesAnswered: acc.messagesAnswered + (day.messages_answered || 0),
-      avgResponseTime: acc.avgResponseTime + (day.avg_response_time || 0),
-      successRate: acc.successRate + (day.success_rate || 0),
-      automationsCompleted: acc.automationsCompleted + (day.automations_completed || 0),
+      revenueAssisted: acc.revenueAssisted + (day.revenueAssisted ?? day.revenue_assisted ?? 0),
+      customersHelped: acc.customersHelped + (day.customersHelped ?? day.customers_helped ?? 0),
+      appointmentsBooked: acc.appointmentsBooked + (day.appointmentsBooked ?? day.appointments_booked ?? 0),
+      ordersClosed: acc.ordersClosed + (day.ordersClosed ?? day.orders_closed ?? 0),
+      hoursSaved: acc.hoursSaved + (day.hoursSaved ?? day.hours_saved ?? 0),
+      messagesAnswered: acc.messagesAnswered + (day.messagesAnswered ?? day.messages_answered ?? 0),
+      avgResponseTime: acc.avgResponseTime + (day.avgResponseTime ?? day.avg_response_time ?? 0),
+      successRate: acc.successRate + (day.successRate ?? day.success_rate ?? 0),
+      automationsCompleted: acc.automationsCompleted + (day.automationsCompleted ?? day.automations_completed ?? 0),
     }), {
       revenueAssisted: 0,
       customersHelped: 0,
@@ -149,22 +153,22 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
   const chartData = useMemo(() => {
     return analytics.map(day => ({
       date: new Date(day.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" }),
-      revenue: day.revenue_assisted || 0,
-      customers: day.customers_helped || 0,
-      appointments: day.appointments_booked || 0,
-      orders: day.orders_closed || 0,
-      hoursSaved: day.hours_saved || 0,
-      messages: day.messages_answered || 0,
-      responseTime: day.avg_response_time || 0,
-      successRate: day.success_rate || 0,
-      automations: day.automations_completed || 0,
+      revenue: day.revenueAssisted ?? 0,
+      customers: day.customersHelped ?? 0,
+      appointments: day.appointmentsBooked ?? 0,
+      orders: day.ordersClosed ?? 0,
+      hoursSaved: day.hoursSaved ?? 0,
+      messages: day.messagesAnswered ?? 0,
+      responseTime: day.avgResponseTime ?? 0,
+      successRate: day.successRate ?? 0,
+      automations: day.automationsCompleted ?? 0,
     }));
   }, [analytics]);
 
   const departmentStats = useMemo(() => {
     if (!analytics.length) return {};
     const latest = analytics[analytics.length - 1];
-    return latest.department_stats || {};
+    return latest.departmentStats ?? latest.department_stats ?? {};
   }, [analytics]);
 
   const formatNumber = (num: number) => {
@@ -397,8 +401,8 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
             </h3>
             <div className="space-y-3">
               {departments.map((dept) => {
-                const stats = departmentStats[dept.type] || { tasks_today: 0, completed_today: 0, success_rate: 0 };
-                const progress = stats.tasks_today > 0 ? (stats.completed_today / stats.tasks_today) * 100 : 0;
+                const stats = departmentStats[dept.type] || { tasksToday: 0, completedToday: 0, successRate: 0 };
+                const progress = stats.tasksToday > 0 ? (stats.completedToday / stats.tasksToday) * 100 : 0;
                 return (
                   <motion.div
                     key={dept.id}
@@ -435,8 +439,8 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11.5px] text-ink-300">{stats.tasks_today} tasks today</span>
-                        <span className="text-[11.5px] font-medium text-white">{stats.completed_today} completed</span>
+                        <span className="text-[11.5px] text-ink-300">{stats.tasksToday} tasks today</span>
+                        <span className="text-[11.5px] font-medium text-white">{stats.completedToday} completed</span>
                       </div>
                       <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                         <motion.div
@@ -447,7 +451,7 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
                         />
                       </div>
                       <div className="flex items-center justify-between text-[10px] text-ink-400">
-                        <span>Success rate: {stats.success_rate.toFixed(1)}%</span>
+                        <span>Success rate: {stats.successRate.toFixed(1)}%</span>
                         <span>{progress.toFixed(0)}% progress</span>
                       </div>
                     </div>
@@ -531,11 +535,11 @@ export function AnalyticsPage({ businessId: propBusinessId }: AnalyticsPageProps
               </div>
 
               <div className="space-y-3 mb-4">
-                <MetricRow label="Tasks Today" value={departmentStats[dept.type]?.tasks_today || 0} />
-                <MetricRow label="Completed" value={departmentStats[dept.type]?.completed_today || 0} positive />
-                <MetricRow label="Pending" value={(departmentStats[dept.type]?.tasks_today || 0) - (departmentStats[dept.type]?.completed_today || 0)} />
-                <MetricRow label="Avg Response" value={`${(departmentStats[dept.type]?.success_rate || 0).toFixed(1)}s`} />
-                <MetricRow label="Success Rate" value={`${(departmentStats[dept.type]?.success_rate || 0).toFixed(1)}%`} positive />
+                <MetricRow label="Tasks Today" value={departmentStats[dept.type]?.tasksToday ?? departmentStats[dept.type]?.tasks_today ?? 0} />
+                <MetricRow label="Completed" value={departmentStats[dept.type]?.completedToday ?? departmentStats[dept.type]?.completed_today ?? 0} positive />
+                <MetricRow label="Pending" value={(departmentStats[dept.type]?.tasksToday ?? departmentStats[dept.type]?.tasks_today ?? 0) - (departmentStats[dept.type]?.completedToday ?? departmentStats[dept.type]?.completed_today ?? 0)} />
+                <MetricRow label="Avg Response" value={`${(departmentStats[dept.type]?.successRate ?? departmentStats[dept.type]?.success_rate ?? 0).toFixed(1)}s`} />
+                <MetricRow label="Success Rate" value={`${(departmentStats[dept.type]?.successRate ?? departmentStats[dept.type]?.success_rate ?? 0).toFixed(1)}%`} positive />
               </div>
 
               <Button 

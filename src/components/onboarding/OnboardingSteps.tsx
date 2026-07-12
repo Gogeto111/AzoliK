@@ -54,7 +54,7 @@ export function DiscoveryStep({ onComplete, onBack }: { onComplete: () => void; 
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://api.azolik.ai/api/business/discover?phone=${profile?.phone || user?.phoneNumber}`);
+      const response = await fetch(`https://api.azolik.ai/api/business/discover?phone=${profile?.phoneNumber || user?.phoneNumber}`);
       if (!response.ok) throw new Error("Discovery failed");
       const data = await response.json();
       setBusinessData(data);

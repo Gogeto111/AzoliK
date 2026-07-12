@@ -31,21 +31,21 @@ export function RazorpayIntegration() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    if (profile?.business_id) {
+    if (profile?.businessId) {
       setOrders([]);
     }
   }, [profile]);
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile?.business_id) return;
+    if (!profile?.businessId) return;
 
     setCreating(true);
     try {
       const { createPaymentOrder } = await import("@/services/razorpay");
       await createPaymentOrder(
-        profile.business_id,
-        profile.id,
+        profile.businessId,
+        profile.uid,
         formData.amount * 100,
         formData.currency,
         formData.description,
@@ -66,7 +66,7 @@ export function RazorpayIntegration() {
     alert("Copied to clipboard!");
   };
 
-  if (!profile?.business_id) {
+  if (!profile?.businessId) {
     return (
       <GlassCard className="p-8 text-center">
         <Shield className="h-12 w-12 text-ink-400 mx-auto mb-4" />
@@ -147,8 +147,8 @@ export function RazorpayIntegration() {
                     setCreating(true);
                     try {
                       const { createPaymentOrder } = await import("@/services/razorpay");
-                      if (!profile?.business_id || !profile?.id) return;
-                      await createPaymentOrder(profile.business_id, profile.id, formData.amount * 100, formData.currency, formData.description, {
+                      if (!profile?.businessId || !profile?.uid) return;
+                      await createPaymentOrder(profile.businessId, profile.uid, formData.amount * 100, formData.currency, formData.description, {
                         customerName: formData.customer.name,
                         customerEmail: formData.customer.email,
                       });

@@ -1,7 +1,53 @@
-import { sb, AIWorkflowExecution, WorkflowStep, KnowledgeBaseItem, Conversation, Task } from "@/lib/supabase";
-import { getSupabase } from "@/lib/supabase";
+import {
+  db,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit as firestoreLimit,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+} from "@/lib/firebase";
 
-// AI Engine - Core workflow execution
+interface WorkflowStep {
+  id: string;
+  executionId: string;
+  name: string;
+  type: string;
+  status: "running" | "completed" | "failed";
+  startedAt: string;
+  completedAt?: string;
+  output?: any;
+  error?: string;
+}
+
+interface AIWorkflowExecution {
+  id: string;
+  businessId: string;
+  department: string;
+  triggerType: string;
+  triggerData: any;
+  status: string;
+  steps: WorkflowStep[];
+  startedAt: string;
+  completedAt?: string;
+  error?: string;
+}
+
+interface KnowledgeBaseItem {
+  id: string;
+  businessId: string;
+  category: string;
+  title: string;
+  content: string;
+  metadata: any;
+}
+
 export class AIEngine {
   private businessId: string;
   private department: string;
@@ -11,7 +57,6 @@ export class AIEngine {
     this.department = department;
   }
 
-  // Main entry point: Process incoming message
   async processIncomingMessage(conversationId: string, messageId: string, content: string, senderId: string) {
     const execution = await this.createExecution("message", {
       conversationId,
@@ -21,20 +66,19 @@ export class AIEngine {
     });
 
     try {
-      // Step 1: Read knowledge base
       await this.executeStep(execution.id, "read_knowledge", "Read Knowledge Base", async () => {
         const knowledge = await this.searchKnowledge(content);
         return { knowledge, query: content };
       });
 
-      // Step 2: Generate AI reply
       const replyResult = await this.executeStep(execution.id, "generate_reply", "Generate AI Reply", async () => {
-        const knowledge = execution.steps.find((s: WorkflowStep) => s.name === "Read Knowledge Base")?.output?.knowledge || [];
+        const executionSnap = await getDoc(doc(db, "ai_workflow_executions", execution.id));
+        const execData = executionSnap.data() as AIWorkflowExecution;
+        const knowledge = execData?.steps?.find((s) => s.name === "Read Knowledge Base")?.output?.knowledge || [];
         const reply = await this.generateReply(content, knowledge);
         return { reply };
       });
 
-      // Step 3: Send reply
       await this.executeStep(execution.id, "send_message", "Send Reply", async () => {
         const reply = replyResult.output?.reply;
         if (reply) {
@@ -43,15 +87,13 @@ export class AIEngine {
         return { sent: true };
       });
 
-      // Step 4: Update CRM / Conversation
       await this.executeStep(execution.id, "update_crm", "Update CRM", async () => {
         await this.updateConversation(conversationId, content);
         return { updated: true };
       });
 
-      // Step 5: Check for actions needed (booking, invoice, etc.)
       const actions = await this.detectActions(content, replyResult.output?.reply);
-      
+
       if (actions.bookAppointment) {
         await this.executeStep(execution.id, "book_appointment", "Book Appointment", async () => {
           const appointment = await this.bookAppointment(actions.bookAppointment);
@@ -80,9 +122,10 @@ export class AIEngine {
         });
       }
 
-      // Mark execution as completed
       await this.completeExecution(execution.id);
-      return execution;
+
+      const finalSnap = await getDoc(doc(db, "ai_workflow_executions", execution.id));
+      return { id: finalSnap.id, ...finalSnap.data() } as AIWorkflowExecution;
 
     } catch (error) {
       await this.failExecution(execution.id, error instanceof Error ? error.message : "Unknown error");
@@ -90,122 +133,108 @@ export class AIEngine {
     }
   }
 
-  // Create workflow execution record
-  private async createExecution(triggerType: AIWorkflowExecution["trigger_type"], triggerData: any) {
-    const { data, error } = await sb
-      .from("ai_workflow_executions")
-      .insert({
-        business_id: this.businessId,
-        department: this.department,
-        trigger_type: triggerType,
-        trigger_data: triggerData,
-        status: "running",
-        steps: [],
-        started_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+  private async createExecution(triggerType: string, triggerData: any): Promise<AIWorkflowExecution> {
+    const executionData = {
+      businessId: this.businessId,
+      department: this.department,
+      triggerType: triggerType,
+      triggerData: triggerData,
+      status: "running",
+      steps: [],
+      startedAt: new Date().toISOString(),
+    };
 
-    if (error) throw error;
-    return data;
+    const docRef = await addDoc(collection(db, "ai_workflow_executions"), executionData);
+    return { id: docRef.id, ...executionData } as AIWorkflowExecution;
   }
 
-  // Execute a single step
   private async executeStep(
-    executionId: string, 
-    stepType: WorkflowStep["type"], 
-    stepName: string, 
+    executionId: string,
+    stepType: string,
+    stepName: string,
     fn: () => Promise<any>
   ): Promise<WorkflowStep> {
-    // Create step record
     const stepId = `step_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const step: WorkflowStep = {
       id: stepId,
-      execution_id: executionId,
+      executionId: executionId,
       name: stepName,
       type: stepType,
       status: "running",
-      started_at: new Date().toISOString(),
+      startedAt: new Date().toISOString(),
     };
 
-    // Update execution with new step
-    const { data: exec } = await sb
-      .from("ai_workflow_executions")
-      .select("steps")
-      .eq("id", executionId)
-      .single();
-    
-    const existingSteps = exec?.steps || [];
-    await sb
-      .from("ai_workflow_executions")
-      .update({ 
-        steps: [...existingSteps, step],
-      })
-      .eq("id", executionId);
+    const execSnap = await getDoc(doc(db, "ai_workflow_executions", executionId));
+    const existingSteps = (execSnap.data()?.steps as WorkflowStep[]) || [];
+    await updateDoc(doc(db, "ai_workflow_executions", executionId), {
+      steps: [...existingSteps, step],
+    });
 
     try {
       const output = await fn();
-      
-      // Update step as completed
-      const completedStep = {
+
+      const completedStep: WorkflowStep = {
         ...step,
-        status: "completed" as const,
+        status: "completed",
         output,
-        completed_at: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
       };
 
-      const { data: execData } = await sb
-        .from("ai_workflow_executions")
-        .select("steps")
-        .eq("id", executionId)
-        .single();
-      const updatedSteps = (execData?.steps || []).map((s: WorkflowStep) => s.id === stepId ? completedStep : s);
-      await sb
-        .from("ai_workflow_executions")
-        .update({ steps: updatedSteps })
-        .eq("id", executionId);
+      const updatedSnap = await getDoc(doc(db, "ai_workflow_executions", executionId));
+      const updatedSteps = ((updatedSnap.data()?.steps as WorkflowStep[]) || []).map((s) =>
+        s.id === stepId ? completedStep : s
+      );
+      await updateDoc(doc(db, "ai_workflow_executions", executionId), { steps: updatedSteps });
 
       return completedStep;
     } catch (error) {
-      // Update step as failed
-      const failedStep = {
+      const failedStep: WorkflowStep = {
         ...step,
-        status: "failed" as const,
+        status: "failed",
         error: error instanceof Error ? error.message : "Unknown error",
-        completed_at: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
       };
 
-      const { data: failData } = await sb
-        .from("ai_workflow_executions")
-        .select("steps")
-        .eq("id", executionId)
-        .single();
-      const failSteps = (failData?.steps || []).map((s: WorkflowStep) => s.id === stepId ? failedStep : s);
-      await sb
-        .from("ai_workflow_executions")
-        .update({ steps: failSteps })
-        .eq("id", executionId);
+      const failSnap = await getDoc(doc(db, "ai_workflow_executions", executionId));
+      const failSteps = ((failSnap.data()?.steps as WorkflowStep[]) || []).map((s) =>
+        s.id === stepId ? failedStep : s
+      );
+      await updateDoc(doc(db, "ai_workflow_executions", executionId), { steps: failSteps });
 
       throw error;
     }
   }
 
-  // Search knowledge base for relevant info
-  private async searchKnowledge(query: string): Promise<KnowledgeBaseItem[]> {
-    // In production, use vector similarity search with embeddings
-    // For now, use text search
-    const { data, error } = await sb
-      .from("knowledge_base")
-      .select("*")
-      .eq("business_id", this.businessId)
-      .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
-      .limit(10);
+  private async searchKnowledge(searchQuery: string): Promise<KnowledgeBaseItem[]> {
+    const knowledgeRef = collection(db, "businesses", this.businessId, "knowledge");
+    const q = query(knowledgeRef, firestoreLimit(50));
+    const snapshot = await getDocs(q);
 
-    if (error) throw error;
-    return data || [];
+    const lowerQuery = searchQuery.toLowerCase();
+    const results: KnowledgeBaseItem[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const item: KnowledgeBaseItem = {
+        id: docSnap.id,
+        businessId: data.businessId || this.businessId,
+        category: data.category || "",
+        title: data.title || "",
+        content: data.content || "",
+        metadata: data.metadata || {},
+      };
+
+      if (
+        item.title.toLowerCase().includes(lowerQuery) ||
+        item.content.toLowerCase().includes(lowerQuery)
+      ) {
+        results.push(item);
+      }
+    });
+
+    return results.slice(0, 10);
   }
 
-  // Generate AI reply using OpenAI API
   private async generateReply(userMessage: string, knowledge: KnowledgeBaseItem[]): Promise<string> {
     const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
     if (!apiKey) {
@@ -213,7 +242,7 @@ export class AIEngine {
     }
 
     const knowledgeContext = knowledge.length > 0
-      ? "\n\nKnowledge base context:\n" + knowledge.map(k => `- ${k.title}: ${k.content}`).join("\n")
+      ? "\n\nKnowledge base context:\n" + knowledge.map((k) => `- ${k.title}: ${k.content}`).join("\n")
       : "";
 
     const systemPrompt = `You are an AI assistant for a business department: ${this.department}.${knowledgeContext}
@@ -246,47 +275,33 @@ Respond helpfully, concisely, and professionally. Use the knowledge base context
     return data.choices?.[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
   }
 
-  // Send message to conversation
   private async sendMessage(conversationId: string, content: string) {
-    const { error } = await sb
-      .from("messages")
-      .insert({
-        conversation_id: conversationId,
-        sender_id: "ai_engine",
-        sender_type: "ai",
-        sender_name: "Azolik AI",
-        content,
-        type: "text",
-        status: "sent",
-        created_at: new Date().toISOString(),
-      });
+    const messagesRef = collection(db, "businesses", this.businessId, "conversations", conversationId, "messages");
+    await addDoc(messagesRef, {
+      conversationId: conversationId,
+      senderId: "ai_engine",
+      senderType: "ai",
+      senderName: "Azolik AI",
+      content,
+      type: "text",
+      status: "sent",
+      createdAt: Date.now(),
+    });
 
-    if (error) throw error;
-
-    // Update conversation last message
-    await sb
-      .from("conversations")
-      .update({
-        last_message: content,
-        last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", conversationId);
+    await updateDoc(doc(db, "businesses", this.businessId, "conversations", conversationId), {
+      lastMessage: content,
+      lastMessageAt: Date.now(),
+      updatedAt: Date.now(),
+    });
   }
 
-  // Update conversation in CRM
-  private async updateConversation(conversationId: string, customerMessage: string) {
-    // Update conversation status, tags, etc.
-    await sb
-      .from("conversations")
-      .update({
-        status: "open",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", conversationId);
+  private async updateConversation(conversationId: string, _customerMessage: string) {
+    await updateDoc(doc(db, "businesses", this.businessId, "conversations", conversationId), {
+      status: "open",
+      updatedAt: Date.now(),
+    });
   }
 
-  // Detect actions needed from message
   private async detectActions(customerMessage: string, aiReply: string) {
     const actions: {
       bookAppointment?: any;
@@ -297,19 +312,16 @@ Respond helpfully, concisely, and professionally. Use the knowledge base context
 
     const lowerMessage = customerMessage.toLowerCase();
 
-    // Detect appointment booking intent
     if (lowerMessage.includes("book") || lowerMessage.includes("appointment") || lowerMessage.includes("schedule")) {
       if (aiReply.includes("date") || aiReply.includes("time")) {
-        // Extract date/time from conversation (simplified)
         actions.bookAppointment = {
-          customerId: "", // Would extract from conversation
+          customerId: "",
           requestedTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           reason: "Customer requested appointment",
         };
       }
     }
 
-    // Detect invoice creation intent
     if (lowerMessage.includes("invoice") || lowerMessage.includes("bill me") || lowerMessage.includes("send invoice")) {
       actions.createInvoice = {
         customerId: "",
@@ -318,7 +330,6 @@ Respond helpfully, concisely, and professionally. Use the knowledge base context
       };
     }
 
-    // Detect lead update
     if (this.department === "sales" && (lowerMessage.includes("interested") || lowerMessage.includes("quote"))) {
       actions.updateLead = {
         status: "qualified",
@@ -326,7 +337,6 @@ Respond helpfully, concisely, and professionally. Use the knowledge base context
       };
     }
 
-    // Detect task creation
     if (lowerMessage.includes("follow up") || lowerMessage.includes("call me") || lowerMessage.includes("email me")) {
       actions.createTask = {
         title: "Follow up with customer",
@@ -339,137 +349,112 @@ Respond helpfully, concisely, and professionally. Use the knowledge base context
     return actions;
   }
 
-  // Book appointment
   private async bookAppointment(data: any) {
-    // Create calendar event via Google Calendar integration
-    // Create task for team
-    const { data: task, error } = await sb
-      .from("tasks")
-      .insert({
-        business_id: this.businessId,
-        department: this.department,
-        title: "Appointment Booking",
-        description: `Book appointment for customer: ${data.reason}`,
-        status: "pending",
-        priority: "high",
-        metadata: { type: "appointment", ...data },
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const tasksRef = collection(db, "businesses", this.businessId, "tasks");
+    const docRef = await addDoc(tasksRef, {
+      businessId: this.businessId,
+      department: this.department,
+      title: "Appointment Booking",
+      description: `Book appointment for customer: ${data.reason}`,
+      status: "pending",
+      priority: "high",
+      metadata: { type: "appointment", ...data },
+      createdAt: Date.now(),
+    });
 
-    if (error) throw error;
-    return task;
+    return { id: docRef.id };
   }
 
-  // Create invoice
   private async createInvoice(data: any) {
-    const { data: invoice, error } = await sb
-      .from("invoices")
-      .insert({
-        business_id: this.businessId,
-        customer_id: data.customerId,
-        customer_name: "",
-        customer_phone: "",
-        items: data.items,
-        subtotal: 0,
-        tax: 0,
-        total: 0,
-        currency: "INR",
-        status: "draft",
-        due_date: data.dueDate,
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const invoicesRef = collection(db, "businesses", this.businessId, "invoices");
+    const docRef = await addDoc(invoicesRef, {
+      businessId: this.businessId,
+      customerId: data.customerId,
+      customerName: "",
+      customerPhone: "",
+      items: data.items,
+      subtotal: 0,
+      tax: 0,
+      total: 0,
+      currency: "INR",
+      status: "draft",
+      dueDate: data.dueDate,
+      createdAt: Date.now(),
+    });
 
-    if (error) throw error;
-    return invoice;
+    return { id: docRef.id };
   }
 
-  // Update lead in Supabase
   private async updateLead(data: any) {
-    const { data: lead, error } = await sb
-      .from("leads")
-      .update({
+    const leadsRef = collection(db, "businesses", this.businessId, "leads");
+    const q = query(leadsRef, where("businessId", "==", this.businessId), firestoreLimit(1));
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      const leadDoc = snapshot.docs[0];
+      await updateDoc(doc(db, "businesses", this.businessId, "leads", leadDoc.id), {
         status: data.status || "qualified",
         notes: data.notes || "",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("business_id", this.businessId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return lead;
+        updatedAt: Date.now(),
+      });
+    }
   }
 
-  // Create task
   private async createTask(data: any) {
-    const { data: task, error } = await sb
-      .from("tasks")
-      .insert({
-        business_id: this.businessId,
-        department: this.department,
-        title: data.title,
-        description: data.description,
-        status: "pending",
-        priority: data.priority || "medium",
-        due_at: data.dueAt,
-        metadata: { type: "follow_up" },
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const tasksRef = collection(db, "businesses", this.businessId, "tasks");
+    const docRef = await addDoc(tasksRef, {
+      businessId: this.businessId,
+      department: this.department,
+      title: data.title,
+      description: data.description,
+      status: "pending",
+      priority: data.priority || "medium",
+      dueAt: data.dueAt,
+      metadata: { type: "follow_up" },
+      createdAt: Date.now(),
+    });
 
-    if (error) throw error;
-    return task;
+    return { id: docRef.id };
   }
 
-  // Complete execution
   private async completeExecution(executionId: string) {
-    await sb
-      .from("ai_workflow_executions")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", executionId);
+    await updateDoc(doc(db, "ai_workflow_executions", executionId), {
+      status: "completed",
+      completedAt: new Date().toISOString(),
+    });
   }
 
-  // Fail execution
   private async failExecution(executionId: string, error: string) {
-    await sb
-      .from("ai_workflow_executions")
-      .update({
-        status: "failed",
-        error,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", executionId);
+    await updateDoc(doc(db, "ai_workflow_executions", executionId), {
+      status: "failed",
+      error,
+      completedAt: new Date().toISOString(),
+    });
   }
 
-  // Get execution history
-  async getExecutionHistory(limit = 50) {
-    const { data, error } = await sb
-      .from("ai_workflow_executions")
-      .select("*")
-      .eq("business_id", this.businessId)
-      .eq("department", this.department)
-      .order("started_at", { ascending: false })
-      .limit(limit);
+  async getExecutionHistory(maxLimit = 50) {
+    const execRef = collection(db, "ai_workflow_executions");
+    const q = query(
+      execRef,
+      where("businessId", "==", this.businessId),
+      where("department", "==", this.department),
+      orderBy("startedAt", "desc"),
+      firestoreLimit(maxLimit)
+    );
 
-    if (error) throw error;
-    return data || [];
+    const snapshot = await getDocs(q);
+    const results: AIWorkflowExecution[] = [];
+    snapshot.forEach((docSnap) => {
+      results.push({ id: docSnap.id, ...docSnap.data() } as AIWorkflowExecution);
+    });
+    return results;
   }
 }
 
-// Factory function
 export function createAIEngine(businessId: string, department: string) {
   return new AIEngine(businessId, department);
 }
 
-// Department-specific engines
 export const SupportEngine = (businessId: string) => createAIEngine(businessId, "support");
 export const SalesEngine = (businessId: string) => createAIEngine(businessId, "sales");
 export const FinanceEngine = (businessId: string) => createAIEngine(businessId, "finance");

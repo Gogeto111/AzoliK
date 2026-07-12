@@ -59,7 +59,7 @@ export function AIDiscoveryScreen({ onComplete, onBack }: AIDiscoveryScreenProps
 
   const discoverBusiness = useCallback(async () => {
     try {
-      const phone = profile?.phone || "";
+      const phone = profile?.phoneNumber || "";
       if (!phone) {
         throw new Error("No phone number available");
       }

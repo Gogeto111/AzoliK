@@ -13,7 +13,14 @@ import {
 import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { cn } from "@/lib/utils";
-import { getSupabase, IntegrationConfig } from "@/lib/supabase";
+import { auth, db, doc, getDoc, updateDoc } from "@/lib/firebase";
+
+interface IntegrationConfig {
+  connected: boolean;
+  config?: Record<string, any>;
+  last_sync?: string;
+  status: "connected" | "disconnected" | "error";
+}
 
 interface IntegrationsScreenProps {
   onComplete: (data: any) => void;
@@ -235,54 +242,45 @@ export function IntegrationsScreen({ onComplete, onBack }: IntegrationsScreenPro
   }, []);
 
   const loadConnectedIntegrations = async () => {
-    const sb = getSupabase();
-    const { data: { user } } = await sb.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
 
-    const { data: profile } = await sb
-      .from("user_profiles")
-      .select("business_id")
-      .eq("auth_user_id", user.id)
-      .single();
+    const userSnap = await getDoc(doc(db, "users", user.uid));
+    if (!userSnap.exists()) return;
 
-    if (profile?.business_id) {
-      const { data: business } = await sb
-        .from("businesses")
-        .select("integrations")
-        .eq("id", profile.business_id)
-        .single();
+    const businessId = userSnap.data().businessId;
+    if (!businessId) return;
 
-      if (business?.integrations) {
-        setConnectedIntegrations(business.integrations);
-      }
+    const businessSnap = await getDoc(doc(db, "businesses", businessId));
+    if (!businessSnap.exists()) return;
+
+    const integrations = businessSnap.data().integrations;
+    if (integrations) {
+      setConnectedIntegrations(integrations);
     }
   };
 
   const saveIntegrationConfig = async (integrationId: string, config: IntegrationConfig) => {
-    const sb = getSupabase();
-    const { data: { user } } = await sb.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
 
-    const { data: profile } = await sb
-      .from("user_profiles")
-      .select("business_id")
-      .eq("auth_user_id", user.id)
-      .single();
+    const userSnap = await getDoc(doc(db, "users", user.uid));
+    if (!userSnap.exists()) return;
 
-    if (profile?.business_id) {
-      const currentIntegrations = connectedIntegrations;
-      const updatedIntegrations = {
-        ...currentIntegrations,
-        [integrationId]: config,
-      };
+    const businessId = userSnap.data().businessId;
+    if (!businessId) return;
 
-      await sb
-        .from("businesses")
-        .update({ integrations: updatedIntegrations, updated_at: new Date().toISOString() })
-        .eq("id", profile.business_id);
+    const updatedIntegrations = {
+      ...connectedIntegrations,
+      [integrationId]: config,
+    };
 
-      setConnectedIntegrations(updatedIntegrations);
-    }
+    await updateDoc(doc(db, "businesses", businessId), {
+      integrations: updatedIntegrations,
+      updatedAt: Date.now(),
+    });
+
+    setConnectedIntegrations(updatedIntegrations);
   };
 
   const handleGoogleOAuth = (integration: any) => {

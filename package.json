@@ -13,7 +13,6 @@
     "db:reset": "supabase db reset"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.110.2",
     "@xyflow/react": "^12.11.2",
     "clsx": "^2.1.1",
     "firebase": "^11.10.0",

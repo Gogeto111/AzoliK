@@ -23,6 +23,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { useAI } from "@/lib/aiStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 type NavItem = {
   to: string;
@@ -50,6 +51,10 @@ export function Sidebar({ className }: { className?: string }) {
   const location = useLocation();
   const prefersReduced = useReducedMotion();
   const ai = useAI();
+  const { profile, business, logout } = useAuth();
+  const displayName = profile?.displayName || "User";
+  const email = profile?.email || "";
+  const businessName = business?.name || "My Workspace";
   return (
     <aside
       className={cn(
@@ -94,12 +99,12 @@ export function Sidebar({ className }: { className?: string }) {
         className="px-1 pb-2.5"
       >
         <button className="group glass flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-all hover:bg-white/[0.04]">
-          <Avatar name="Northwind" tone="violet" size="sm" />
+          <Avatar name={businessName} tone="violet" size="sm" />
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="truncate text-[12.5px] font-medium text-white">
-              Northwind Labs
+              {businessName}
             </span>
-            <span className="text-[10.5px] text-ink-400">Pro · 4 seats</span>
+            <span className="text-[10.5px] text-ink-400">{business ? "Active" : "No business"}</span>
           </div>
           <ChevronSelector className="h-3.5 w-3.5 text-ink-500 transition-transform group-hover:translate-y-0.5" />
         </button>
@@ -193,25 +198,6 @@ export function Sidebar({ className }: { className?: string }) {
         })}
       </nav>
 
-      {/* Collab / presence */}
-      <div className="mt-2 px-3 pb-2">
-        <div className="flex items-center gap-2 text-[10.5px] font-medium text-ink-400">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
-          </span>
-          3 teammates active
-        </div>
-        <div className="mt-2 flex -space-x-2">
-          <Avatar name="Alex" tone="brand" size="xs" status="online" />
-          <Avatar name="Priya" tone="violet" size="xs" status="online" />
-          <Avatar name="Marcus" tone="emerald" size="xs" status="idle" />
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-ink-800 text-[9.5px] font-medium text-ink-300 ring-2 ring-ink-950">
-            +8
-          </div>
-        </div>
-      </div>
-
       {/* User */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -219,17 +205,20 @@ export function Sidebar({ className }: { className?: string }) {
         transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.6 }}
         className="mt-1 px-1"
       >
-        <button className="group flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.04]">
-          <Avatar name="Alex Morgan" tone="brand" size="sm" status="online" />
+        <button
+          className="group flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.04]"
+          onClick={() => logout()}
+        >
+          <Avatar name={displayName} tone="brand" size="sm" status="online" />
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="truncate text-[12.5px] font-medium text-white">
-              Alex Morgan
+              {displayName}
             </span>
             <span className="truncate text-[10.5px] text-ink-400">
-              alex@northwind.com
+              {email}
             </span>
           </div>
-          <IconButton variant="ghost" size="sm" title="Account">
+          <IconButton variant="ghost" size="sm" title="Sign out">
             <DotsVertical className="h-3.5 w-3.5" />
           </IconButton>
         </button>

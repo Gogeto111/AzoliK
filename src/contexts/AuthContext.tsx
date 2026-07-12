@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { 
-  User, 
-  onAuthStateChanged, 
-  signInWithPopup, 
-  signOut, 
+import {
+  User,
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
   GoogleAuthProvider,
   setPersistence,
   browserLocalPersistence,
@@ -15,8 +15,22 @@ import {
   isSignInWithEmailLink,
   signInWithEmailLink,
 } from "firebase/auth";
-import { auth, googleProvider, db } from "@/lib/firebase";
-import { sb, UserProfile, BusinessProfile, OnboardingData, createDefaultUserProfile, createDefaultDepartments } from "@/lib/supabase";
+import {
+  auth,
+  googleProvider,
+  db,
+  UserProfile,
+  BusinessProfile,
+  OnboardingData,
+  getUserProfile,
+  createUserProfile,
+  updateUserProfile,
+  createBusiness,
+  getBusiness,
+  createDepartment,
+  createDefaultUserProfile,
+  updateUserLastLogin,
+} from "@/lib/firebase";
 
 interface AuthContextType {
   user: User | null;
@@ -59,8 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        await refreshProfile();
-        await refreshBusiness();
+        await refreshProfile(firebaseUser);
+        await refreshBusiness(firebaseUser);
       } else {
         setProfile(null);
         setBusiness(null);
@@ -71,51 +85,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const refreshProfile = async () => {
-    if (!user) return;
+  const refreshProfile = async (firebaseUser?: User | null) => {
+    const currentUser = firebaseUser ?? user;
+    if (!currentUser) return;
     try {
-      const { data, error } = await sb
-        .from("user_profiles")
-        .select("*")
-        .eq("auth_user_id", user.uid)
-        .single();
+      let userProfile = await getUserProfile(currentUser.uid);
       
-      if (error && error.code === "PGRST116") {
-        // Profile doesn't exist, create it
-        const newProfile = createDefaultUserProfile(user.uid, user.email || "", user.displayName || "");
-        const { data: created, error: createError } = await sb
-          .from("user_profiles")
-          .insert(newProfile)
-          .select()
-          .single();
-        
-        if (!createError) {
-          setProfile(created);
-        }
-      } else if (data) {
-        setProfile(data);
-        // Update last login
-        await sb.from("user_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", data.id);
+      if (!userProfile) {
+        const defaultProfile = createDefaultUserProfile(currentUser.uid, currentUser.email || "", currentUser.displayName || "");
+        userProfile = await createUserProfile(currentUser.uid, defaultProfile);
+        setProfile(userProfile);
+      } else {
+        setProfile(userProfile);
+        await updateUserLastLogin(currentUser.uid);
       }
     } catch (e) {
       console.error("Error refreshing profile:", e);
     }
   };
 
-  const refreshBusiness = async () => {
-    if (!profile?.business_id) {
+  const refreshBusiness = async (firebaseUser?: User | null) => {
+    const currentUser = firebaseUser ?? user;
+    // Re-read profile from state since it may have just been set
+    const currentProfile = profile ?? (currentUser ? await getUserProfile(currentUser.uid) : null);
+    if (!currentProfile?.businessId) {
       setBusiness(null);
       return;
     }
     try {
-      const { data, error } = await sb
-        .from("businesses")
-        .select("*")
-        .eq("id", profile.business_id)
-        .single();
-      
-      if (!error && data) {
-        setBusiness(data);
+      const businessData = await getBusiness(currentProfile.businessId);
+      if (businessData) {
+        setBusiness(businessData);
       }
     } catch (e) {
       console.error("Error refreshing business:", e);
@@ -202,14 +202,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (data: Partial<UserProfile>) => {
     if (!user || !profile) throw new Error("No user logged in");
     try {
-      const { data: updated, error } = await sb
-        .from("user_profiles")
-        .update({ ...data, updated_at: new Date().toISOString() })
-        .eq("id", profile.id)
-        .select()
-        .single();
-      
-      if (!error) setProfile(updated);
+      await updateUserProfile(user.uid, data);
+      setProfile(prev => prev ? { ...prev, ...data } : null);
     } catch (error) {
       console.error("Update profile error:", error);
       throw error;
@@ -219,90 +213,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const completeOnboarding = async (data: OnboardingData): Promise<BusinessProfile> => {
     if (!user || !profile) throw new Error("No user logged in");
 
-    // Create business
-    const businessData = {
-      owner_id: profile.id,
-      name: data.businessName,
-      type: data.businessType,
-      phone: data.phone,
-      email: data.email,
-      address: data.address,
-      city: data.city,
-      state: data.state,
-      country: data.country,
-      postal_code: data.postalCode,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      place_id: data.placeId,
-      currency: data.currency,
-      timezone: data.timezone,
-      settings: {
-        auto_reply: true,
-        business_hours: {
-          enabled: true,
-          timezone: data.timezone,
-          schedule: {
-            monday: { open: "09:00", close: "18:00", closed: false },
-            tuesday: { open: "09:00", close: "18:00", closed: false },
-            wednesday: { open: "09:00", close: "18:00", closed: false },
-            thursday: { open: "09:00", close: "18:00", closed: false },
-            friday: { open: "09:00", close: "18:00", closed: false },
-            saturday: { open: "09:00", close: "14:00", closed: false },
-            sunday: { open: "10:00", close: "14:00", closed: true },
-          },
-        },
-        auto_invoice: true,
-        tax_rate: 18,
-        currency_format: "₹",
-      },
-      integrations: {},
-      departments: data.departments,
-    };
+    const newBusiness = await createBusiness(user.uid, data);
 
-    const { data: business, error: bizError } = await sb
-      .from("businesses")
-      .insert(businessData)
-      .select()
-      .single();
+    setBusiness(newBusiness);
+    setProfile(prev => prev ? { ...prev, businessId: newBusiness.id, onboardingComplete: true } : null);
 
-    if (bizError) throw bizError;
-
-    // Create departments
-    const departments = createDefaultDepartments(business.id, data.departments);
-    for (const dept of departments) {
-      await sb.from("departments").insert(dept);
-    }
-
-    // Store knowledge base
-    for (const [category, items] of Object.entries(data.knowledge)) {
-      if (Array.isArray(items)) {
-        for (const item of items) {
-          await sb.from("knowledge_base").insert({
-            business_id: business.id,
-            category,
-            title: item,
-            content: item,
-            metadata: {},
-          });
-        }
-      }
-    }
-
-    // Update user profile
-    await sb
-      .from("user_profiles")
-      .update({ 
-        business_id: business.id, 
-        onboarding_complete: true, 
-        onboarding_step: 10,
-        updated_at: new Date().toISOString() 
-      })
-      .eq("id", profile.id);
-
-    setBusiness(business);
-    setProfile(prev => prev ? { ...prev, business_id: business.id, onboarding_complete: true } : null);
-
-    return business;
+    return newBusiness;
   };
 
   return (
@@ -343,7 +259,7 @@ export function useBusiness() {
 export function useOnboarding() {
   const { profile } = useAuth();
   return {
-    isComplete: profile?.onboarding_complete ?? false,
-    step: profile?.onboarding_step ?? 0,
+    isComplete: profile?.onboardingComplete ?? false,
+    step: profile?.onboardingStep ?? 0,
   };
 }

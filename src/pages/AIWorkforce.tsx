@@ -4,7 +4,6 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
-import { useEngine, workforceEngine, DEPARTMENTS } from "@/lib/engine";
 import {
   Bot, Activity, Brain, Zap, CheckCircle2, Clock, AlertCircle,
   MessageSquare, TrendingUp, Megaphone, Settings2, Calculator, Users,
@@ -12,6 +11,7 @@ import {
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Helper function to get event icon - returns JSX element directly
 function getEventIconElement(type: string) {
@@ -92,74 +92,39 @@ const AGENT_MESSAGES: Record<string, string[]> = {
 };
 
 export default function AIWorkforce() {
-  const state = useEngine();
-  const prefersReduced = useReducedMotion() ?? false;
-  const [, force] = React.useReducer((x) => x + 1, 0);
-  React.useEffect(() => {
-    const id = window.setInterval(force, 1500);
-    return () => window.clearInterval(id);
-  }, []);
+  const { business } = useAuth();
 
-  const activeDeptCount = DEPARTMENTS.filter((d: any) => d.status === "active").length;
-  const totalAgents = DEPARTMENTS.reduce((sum, d) => sum + d.agents.length, 0);
-  const activeAgents = DEPARTMENTS.reduce((sum, d: any) => sum + d.agents.filter((a: any) => a.status === "active" || a.status === "busy").length, 0);
+  if (!business) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="AI Workforce"
+          description="Watch your departments think, work, and hand off in real time."
+        />
+        <GlassCard className="py-16 text-center" tilt={false}>
+          <Bot className="h-12 w-12 text-ink-500 mx-auto mb-3" />
+          <h3 className="text-[16px] font-medium text-white">No business found</h3>
+          <p className="mt-1 text-ink-400">Complete onboarding first to set up your AI workforce.</p>
+          <Button size="sm" variant="primary" className="mt-4" onClick={() => window.location.href = "/onboarding"}>
+            Go to Onboarding
+          </Button>
+        </GlassCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="AI Workforce"
-        description="Watch your departments think, work, and hand off in real time. Each agent shows its current thought process."
-        badge={{ label: `${activeDeptCount}/${DEPARTMENTS.length} departments online`, tone: "emerald", dot: true, pulse: true }}
-        actions={
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-[12px] text-ink-400">
-              <span className="relative flex h-1.5 w-1.5 items-center justify-center">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              </span>
-              {activeAgents}/{totalAgents} agents working
-            </span>
-          </div>
-        }
+        description="Your AI workforce will appear here once departments are configured and work begins."
+        badge={{ label: "Waiting for data", tone: "muted", dot: true }}
       />
-
-      {/* Overview Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={Bot} label="Total Agents" value={totalAgents} delta={`${activeAgents} active`} tone="brand" />
-        <StatTile icon={Activity} label="Departments Online" value={`${activeDeptCount}/${DEPARTMENTS.length}`} delta="All systems go" tone="emerald" />
-        <StatTile icon={Zap} label="Tasks in Progress" value={state.activeTasks.filter((t: any) => t.status === "running" || t.status === "waiting_handoff").length} delta={`${state.metrics.automationsCompleted} completed today`} tone="violet" />
-        <StatTile icon={Brain} label="Thinking Cycles" value={`${Math.floor(Math.random() * 20) + 40}/min`} delta="Real-time reasoning" tone="amber" />
-      </div>
-
-      {/* Department Cards - Alive View */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 260, damping: 26, delay: 0.05 }}
-        className="grid gap-5"
-      >
-        {DEPARTMENTS.map((dept: any, i: number) => (
-          <DepartmentLiveCard key={dept.id} dept={dept} index={i} state={state} prefersReduced={prefersReduced} />
-        ))}
-      </motion.div>
-
-      {/* Live Thought Stream */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 260, damping: 26, delay: 0.2 }}
-      >
-        <GlassCard className="p-6" tilt={false}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-white">
-              <Brain className="h-4 w-4 text-brand-300" />
-              Live Thought Stream
-            </h3>
-            <Badge tone="emerald" dot pulse>Streaming</Badge>
-          </div>
-          <ThoughtStream state={state} />
-        </GlassCard>
-      </motion.div>
+      <GlassCard className="py-16 text-center" tilt={false}>
+        <Brain className="h-12 w-12 text-ink-500 mx-auto mb-3" />
+        <h3 className="text-[16px] font-medium text-white">No active workforce yet</h3>
+        <p className="mt-1 text-ink-400">Departments and agents will appear here once they start processing real work.</p>
+      </GlassCard>
     </div>
   );
 }

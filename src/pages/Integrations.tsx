@@ -12,7 +12,15 @@ import {
   Plus, Search, Wifi, WifiOff, AlertTriangle, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEngine } from "@/lib/engine";
+import { useAuth } from "@/contexts/AuthContext";
+import { db, doc, getDoc } from "@/lib/firebase";
+
+interface IntegrationConfig {
+  connected: boolean;
+  config?: Record<string, any>;
+  last_sync?: string;
+  status: "connected" | "disconnected" | "error";
+}
 
 type Integration = {
   id: string;
@@ -29,21 +37,21 @@ type Integration = {
   description: string;
 };
 
-const INTEGRATIONS: Integration[] = [
-  { id: "whatsapp", name: "WhatsApp Business", category: "Communication", color: "#25D366", letter: "W", connected: true, account: "+91 98***4321", health: "healthy", lastSync: "2s ago", permissions: ["Send", "Read", "Reply"], recent: ["Inbound msg from Priya", "Sent order confirm"], description: "Send & receive WhatsApp messages with customers" },
-  { id: "gmail", name: "Gmail", category: "Communication", color: "#EA4335", letter: "M", connected: true, account: "alex@northwind.com", health: "healthy", lastSync: "4s ago", permissions: ["Send", "Read", "Labels"], recent: ["Sent follow-up to Marcus", "Invoice from vendor received"], description: "Send and read emails across accounts" },
-  { id: "slack", name: "Slack", category: "Communication", color: "#E01E5A", letter: "S", connected: true, account: "northwind.slack.com", health: "healthy", lastSync: "just now", permissions: ["Post", "Read channels"], recent: ["Alerted team to VIP ticket", "Posted Q3 campaign draft"], description: "Team notifications & alerts" },
-  { id: "sheets", name: "Google Sheets", category: "Productivity", color: "#34A853", letter: "X", connected: true, account: "Finance Tracker", health: "healthy", lastSync: "1m ago", permissions: ["Read", "Write"], recent: ["Logged expense ₹499", "Pushed revenue data"], description: "Read and write spreadsheets" },
-  { id: "calendar", name: "Google Calendar", category: "Productivity", color: "#4285F4", letter: "C", connected: true, account: "alex@northwind.com", health: "healthy", lastSync: "3m ago", permissions: ["Read", "Create events"], recent: ["Booked Acme Corp demo", "Scheduled candidate interview"], description: "Schedule and manage meetings" },
-  { id: "notion", name: "Notion", category: "Productivity", color: "#ffffff", letter: "N", connected: true, account: "northwind.notion.site", health: "healthy", lastSync: "12m ago", permissions: ["Read", "Write pages"], recent: ["Added new hire onboarding doc", "Saved campaign brief"], description: "Docs & knowledge base" },
-  { id: "shopify", name: "Shopify", category: "E-commerce", color: "#96BF48", letter: "S", connected: true, account: "northwind.myshopify.com", health: "healthy", lastSync: "30s ago", permissions: ["Products", "Orders"], recent: ["Synced 42 new orders", "Updated inventory"], description: "Products, orders & customers" },
-  { id: "woo", name: "WooCommerce", category: "E-commerce", color: "#7F54B3", letter: "W", connected: false, health: "disconnected", lastSync: "—", permissions: [], recent: [], description: "WordPress e-commerce store" },
-  { id: "razorpay", name: "Razorpay", category: "Payments", color: "#0F2683", letter: "R", connected: true, account: "rzp_live_***", health: "healthy", lastSync: "15s ago", permissions: ["Payments", "Payouts", "Links"], recent: ["Created payment link ₹2,499", "Payout settled ₹14,210"], description: "Indian payment gateway" },
-  { id: "stripe", name: "Stripe", category: "Payments", color: "#635BFF", letter: "S", connected: true, account: "acct_***", health: "degraded", lastSync: "8m ago", permissions: ["Subscriptions", "Charges"], recent: ["Subscription renewed", "Webhook delayed"], description: "Global subscriptions & payments" },
-  { id: "hubspot", name: "HubSpot", category: "CRM", color: "#FF7A59", letter: "H", connected: true, account: "northwind.hubspot.com", health: "healthy", lastSync: "2m ago", permissions: ["Leads", "Deals", "Contacts"], recent: ["New lead Atlas Corp", "Deal moved to closed-won"], description: "Inbound marketing & CRM" },
-  { id: "zoho", name: "Zoho CRM", category: "CRM", color: "#E42528", letter: "Z", connected: false, health: "disconnected", lastSync: "—", permissions: [], recent: [], description: "Sales & customer management" },
-  { id: "outlook", name: "Microsoft Outlook", category: "Communication", color: "#0078D4", letter: "O", connected: false, health: "disconnected", lastSync: "—", permissions: [], recent: [], description: "Microsoft email & calendar" },
-  { id: "discord", name: "Discord", category: "Communication", color: "#5865F2", letter: "D", connected: false, health: "disconnected", lastSync: "—", permissions: [], recent: [], description: "Community & server alerts" },
+const AVAILABLE_INTEGRATIONS: Omit<Integration, "connected" | "account" | "health" | "lastSync" | "permissions" | "recent">[] = [
+  { id: "whatsapp", name: "WhatsApp Business", category: "Communication", color: "#25D366", letter: "W", description: "Send & receive WhatsApp messages with customers" },
+  { id: "gmail", name: "Gmail", category: "Communication", color: "#EA4335", letter: "M", description: "Send and read emails across accounts" },
+  { id: "slack", name: "Slack", category: "Communication", color: "#E01E5A", letter: "S", description: "Team notifications & alerts" },
+  { id: "sheets", name: "Google Sheets", category: "Productivity", color: "#34A853", letter: "X", description: "Read and write spreadsheets" },
+  { id: "calendar", name: "Google Calendar", category: "Productivity", color: "#4285F4", letter: "C", description: "Schedule and manage meetings" },
+  { id: "notion", name: "Notion", category: "Productivity", color: "#ffffff", letter: "N", description: "Docs & knowledge base" },
+  { id: "shopify", name: "Shopify", category: "E-commerce", color: "#96BF48", letter: "S", description: "Products, orders & customers" },
+  { id: "woo", name: "WooCommerce", category: "E-commerce", color: "#7F54B3", letter: "W", description: "WordPress e-commerce store" },
+  { id: "razorpay", name: "Razorpay", category: "Payments", color: "#0F2683", letter: "R", description: "Indian payment gateway" },
+  { id: "stripe", name: "Stripe", category: "Payments", color: "#635BFF", letter: "S", description: "Global subscriptions & payments" },
+  { id: "hubspot", name: "HubSpot", category: "CRM", color: "#FF7A59", letter: "H", description: "Inbound marketing & CRM" },
+  { id: "zoho", name: "Zoho CRM", category: "CRM", color: "#E42528", letter: "Z", description: "Sales & customer management" },
+  { id: "outlook", name: "Microsoft Outlook", category: "Communication", color: "#0078D4", letter: "O", description: "Microsoft email & calendar" },
+  { id: "discord", name: "Discord", category: "Communication", color: "#5865F2", letter: "D", description: "Community & server alerts" },
 ];
 
 const CATEGORIES = [
@@ -65,28 +73,67 @@ const healthMap = {
 export default function Integrations() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
-  const engine = useEngine();
+  const { business, profile } = useAuth();
+  const [connectedMap, setConnectedMap] = useState<Record<string, IntegrationConfig>>({});
+  const [loading, setLoading] = React.useState(true);
 
-  const callCounts = React.useMemo(() => {
-    const counts: Record<string, number> = {};
-    engine.toolCalls.forEach((c) => { counts[c.tool] = (counts[c.tool] ?? 0) + 1; });
-    return counts;
-  }, [engine.toolCalls.length]);
+  React.useEffect(() => {
+    if (!profile?.businessId) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      const bizSnap = await getDoc(doc(db, "businesses", profile.businessId!));
+      const bizData = bizSnap.data();
+      if (bizData?.integrations) setConnectedMap(bizData.integrations);
+      setLoading(false);
+    })();
+  }, [profile?.businessId]);
 
-  const filtered = INTEGRATIONS.filter((i) => {
+  const integrations: Integration[] = AVAILABLE_INTEGRATIONS.map((base) => {
+    const config = connectedMap[base.id];
+    const isConnected = config?.connected === true;
+    return {
+      ...base,
+      connected: isConnected,
+      account: isConnected ? (config as any)?.account : undefined,
+      health: isConnected ? "healthy" : "disconnected",
+      lastSync: isConnected && config?.last_sync ? new Date(config.last_sync).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—",
+      permissions: isConnected ? (config as any)?.permissions || [] : [],
+      recent: [],
+    };
+  });
+
+  const filtered = integrations.filter((i) => {
     if (cat !== "all" && i.category.toLowerCase() !== cat) return false;
     if (q && !i.name.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
 
-  const connected = INTEGRATIONS.filter((i) => i.connected).length;
+  const connected = integrations.filter((i) => i.connected).length;
+
+  if (!business) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Integrations"
+          description="Connect Azolik to every tool your business already runs on."
+        />
+        <GlassCard className="py-16 text-center" tilt={false}>
+          <Wifi className="h-12 w-12 text-ink-500 mx-auto mb-3" />
+          <h3 className="text-[16px] font-medium text-white">No business found</h3>
+          <p className="mt-1 text-ink-400">Complete onboarding to set up integrations.</p>
+        </GlassCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Integrations"
         description="Connect Azolik to every tool your business already runs on. Permissions, sync health, and recent activity for every connector."
-        badge={{ label: `${connected} of ${INTEGRATIONS.length} connected`, tone: "emerald", dot: true, pulse: true }}
+        badge={{ label: `${connected} of ${AVAILABLE_INTEGRATIONS.length} connected`, tone: "emerald", dot: true, pulse: true }}
         actions={
           <Button size="md" variant="primary">
             <Plus className="h-4 w-4" /> Browse Marketplace
@@ -177,12 +224,6 @@ export default function Integrations() {
                       <Activity className="h-3 w-3" />
                       <span className="truncate">{i.permissions.length} permissions</span>
                     </div>
-                    {callCounts[i.id] && (
-                      <div className="flex items-center gap-2 text-[11px] text-ink-400">
-                        <ExternalLink className="h-3 w-3" />
-                        <span>{callCounts[i.id]} calls today</span>
-                      </div>
-                    )}
                   </div>
 
                   {i.recent.length > 0 && (
