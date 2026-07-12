@@ -152,96 +152,54 @@ function reducer(state: AIState, event: AIEvent): Omit<AIState, "dispatch"> {
 
 const AIContext = React.createContext<AIState | null>(null);
 
-// Seeded reasoning steps
-function stepsForIntent(intent: string): ReasoningStep[] {
-  if (intent.includes("activate"))
-    return [
-      { label: "Bootstrapping department agents", status: "done" },
-      { label: "Connecting integrations", status: "thinking" },
-      { label: "Warming workflows", status: "pending" },
-      { label: "Reasoning online", status: "pending" },
-    ];
-  if (intent.includes("order") || intent.includes("buy") || intent.includes("stock"))
-    return [
-      { label: "Understanding request", status: "done" },
-      { label: "Checking inventory", status: "thinking" },
-      { label: "Coordinating with Sales", status: "pending" },
-      { label: "Preparing invoice", status: "pending" },
-      { label: "Sending confirmation", status: "pending" },
-    ];
+// Seeded reasoning steps for department visualization
+function stepsForIntent(): ReasoningStep[] {
   return [
-    { label: "Understanding request", status: "done" },
-    { label: "Routing to relevant departments", status: "thinking" },
-    { label: "Gathering context", status: "pending" },
-    { label: "Composing response", status: "pending" },
+    { label: "Support: Reading customer message", status: "pending" },
+    { label: "Support: Reading Business Knowledge", status: "pending" },
+    { label: "Operations: Checking inventory/services", status: "pending" },
+    { label: "Finance: Calculating price if applicable", status: "pending" },
+    { label: "Sales: Preparing customer response", status: "pending" },
+    { label: "Sending reply to customer", status: "pending" },
   ];
 }
 
-function aiReplyFor(q: string): { reply: string; action?: () => void; steps?: ReasoningStep[] } {
-  const lc = q.toLowerCase();
-  // Activate department
-  for (const d of DEPARTMENTS) {
-    if (lc.includes(d.name.toLowerCase()) && (lc.includes("activate") || lc.includes("wake") || lc.includes("turn on"))) {
-      return {
-        reply: `Waking up **${d.name}** now. You'll see agents boot, tools connect, and workflows warm in real-time. Once online, ${d.agents.length} agents will begin processing work immediately.`,
-        action: () => workforceEngine.addTimeline({
-          type: "decision", department: d.id,
-          title: `${d.name} initializing`, description: "Booting agents and connecting tools", status: "running",
-        }),
-        steps: stepsForIntent("activate"),
-      };
-    }
-  }
-  if (lc.includes("order") || lc.includes("buy") || lc.includes("stock") || lc.includes("available")) {
-    workforceEngine.runOrderFlow();
-    return {
-      reply: `On it. I've handed this to your **Support** team — they're checking availability now and will loop in Sales (payment link), Operations (reservation) and Finance (invoice) automatically. Watch the Inbox and Live Execution panels for every step.`,
-      steps: stepsForIntent("order"),
-    };
-  }
-  if (lc.includes("follow up") || lc.includes("lead")) {
-    workforceEngine.runLeadFlow();
-    return {
-      reply: `**Sales** is on a lead now — they'll open CRM, send follow-up and suggest calendar slots. Watch the Inbox to see the reply go out.`
-    };
-  }
-  if (lc.includes("appointment") || lc.includes("book") || lc.includes("slot") || lc.includes("tomorrow")) {
-    workforceEngine.runAppointmentFlow();
-    return {
-      reply: `**Support** is checking the calendar, **Sales** will confirm the slot and collect deposit, and **Marketing** will queue a reminder. You'll get a notification the moment it's booked.`
-    };
-  }
-  if (lc.includes("invoice") || lc.includes("expense") || lc.includes("bill")) {
-    workforceEngine.handleUserRequest("process an invoice");
-    return {
-      reply: `I've handed this to **Finance**. They'll read the bill, categorize it and reconcile it against your ledger.`,
-    };
-  }
-  // For all other queries, fall through to OpenAI (handled in AIProvider)
-  return { reply: "", steps: stepsForIntent("general") };
-}
-
-async function callOpenAI(q: string, businessName: string, ownerName: string): Promise<string> {
+// Call Gemini API with full business knowledge
+async function callGemini(
+  customerMessage: string,
+  businessKnowledge: any,
+  conversationHistory: Message[]
+): Promise<string> {
   try {
-    const response = await fetch("/api/ai/chat", {
+    const previousConversation = conversationHistory
+      .filter(m => m.role === "user" || m.role === "ai")
+      .map(m => ({
+        role: m.role === "user" ? "user" : "assistant" as const,
+        content: m.content
+      }));
+
+    const response = await fetch("/api/ai/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: q,
-        knowledgeContext: [],
-        businessName: businessName || "your business",
+        knowledge: {
+          ...businessKnowledge,
+          previousConversation,
+          customerMessage,
+        }
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error: ${response.status} - ${errorData.error || "Unknown error"}`);
     }
 
     const data = await response.json();
-    return data.reply || "I couldn't process that. Please try again.";
+    return data.reply || "I couldn't generate a response. Please try again.";
   } catch (error) {
-    console.error("OpenAI call failed:", error);
-    return `I understand you're asking about: "${q.slice(0, 100)}". I'm currently coordinating with your departments to handle this. The AI engine is warming up — in the meantime, try asking about orders, appointments, leads, or invoices and I'll coordinate the real work for you.`;
+    console.error("Gemini call failed:", error);
+    return `I'm having trouble connecting to the AI service. Please check your configuration and try again.`;
   }
 }
 
@@ -268,57 +226,16 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     }
   }, [business?.name, profile?.displayName, dispatch, state.conversation.length]);
 
-  // Simulate AI response when the last message is from the user
+  // Handle user messages - call Gemini with business knowledge
   React.useEffect(() => {
     const last = state.conversation[state.conversation.length - 1];
     if (!last || last.role !== "user") return;
-    const q = last.content;
-    const localReply = aiReplyFor(q);
 
-    // If we have a local reply (engine flow), use it immediately
-    if (localReply.reply) {
-      const steps = localReply.steps || stepsForIntent(q);
-      dispatch({ type: "THINKING_START", text: "Coordinating across departments…", steps });
+    const customerMessage = last.content;
+    const steps = stepsForIntent();
+    dispatch({ type: "THINKING_START", text: "Coordinating across departments…", steps });
 
-      const timers: number[] = [];
-      steps.forEach((_, i) => {
-        timers.push(window.setTimeout(() => {
-          setState((s) => {
-            const next = s.thinkingSteps.map((st, idx) =>
-              idx <= i ? { ...st, status: "done" as const } :
-              idx === i + 1 ? { ...st, status: "thinking" as const } : st
-            );
-            const texts = [
-              "Understanding request…",
-              "Checking relevant departments…",
-              "Calling tools and gathering data…",
-              "Coordinating handoffs…",
-              "Finalizing response…",
-            ];
-            return { ...s, thinkingSteps: next, thinkingText: texts[Math.min(i + 1, texts.length - 1)] };
-          });
-        }, 400 + i * 450));
-      });
-
-      const totalDelay = 1200 + steps.length * 450;
-      timers.push(window.setTimeout(() => {
-        dispatch({ type: "AI_RESPONSE", content: localReply.reply, steps: localReply.steps });
-        localReply.action?.();
-        for (const d of DEPARTMENTS) {
-          if (q.toLowerCase().includes(d.name.toLowerCase()) && (q.toLowerCase().includes("activate") || q.toLowerCase().includes("wake"))) {
-            dispatch({ type: "ACTIVATE_DEPT", dept: d.name });
-            break;
-          }
-        }
-      }, totalDelay));
-
-      return () => timers.forEach((t) => window.clearTimeout(t));
-    }
-
-    // Otherwise, call OpenAI via serverless function
-    const steps = stepsForIntent(q);
-    dispatch({ type: "THINKING_START", text: "Thinking with AI…", steps });
-
+    // Animate thinking steps
     const timers: number[] = [];
     steps.forEach((_, i) => {
       timers.push(window.setTimeout(() => {
@@ -328,37 +245,85 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
             idx === i + 1 ? { ...st, status: "thinking" as const } : st
           );
           const texts = [
-            "Understanding your question…",
-            "Searching knowledge base…",
-            "Reasoning with AI…",
-            "Composing response…",
+            "Support: Reading customer message…",
+            "Support: Reading Business Knowledge…",
+            "Operations: Checking inventory/services…",
+            "Finance: Calculating price if applicable…",
+            "Sales: Preparing customer response…",
+            "Sending reply to customer…",
           ];
           return { ...s, thinkingSteps: next, thinkingText: texts[Math.min(i + 1, texts.length - 1)] };
         });
       }, 300 + i * 400));
     });
 
-    const businessName = business?.name || workforceEngine.state.businessName;
-    const ownerName = profile?.displayName || workforceEngine.state.ownerName;
+    // Build business knowledge from engine
+    const engineState = workforceEngine.state;
+    const industryTemplate = (workforceEngine as any).getIndustryTemplate?.();
 
-    callOpenAI(q, businessName, ownerName).then((reply) => {
+    const businessKnowledge = {
+      businessName: engineState.businessName,
+      businessType: industryTemplate?.businessName || "business",
+      businessDescription: `A ${industryTemplate?.businessName || "business"} operating in ${engineState.industry} industry.`,
+      products: engineState.memory
+        .filter(m => m.type === "product")
+        .map(m => {
+          try {
+            const p = JSON.parse(m.value);
+            return { name: p.name, price: p.price, stock: p.stock, unit: p.unit };
+          } catch {
+            return { name: m.key, price: 0, stock: 0 };
+          }
+        }),
+      services: engineState.memory
+        .filter(m => m.type === "service")
+        .map(m => {
+          try {
+            const s = JSON.parse(m.value);
+            return { name: s.name, price: s.price };
+          } catch {
+            return { name: m.key, price: 0 };
+          }
+        }),
+      pricing: Object.fromEntries(
+        engineState.memory
+          .filter(m => m.type === "product")
+          .map(m => {
+            try {
+              const p = JSON.parse(m.value);
+              return [p.name, p.price];
+            } catch {
+              return [m.key, 0];
+            }
+          })
+          .filter(([_, price]) => price > 0)
+      ),
+      openingHours: engineState.memory
+        .find(m => m.key.includes("Working hours") || m.key.includes("hours") || m.key.includes("open"))
+        ?.value || "Contact for hours",
+      policies: engineState.memory
+        .filter(m => m.type === "policy")
+        .map(m => m.key),
+    };
+
+    const conversationHistory = state.conversation.slice(0, -1); // Exclude the current user message
+
+    callGemini(customerMessage, businessKnowledge, conversationHistory).then((reply) => {
       timers.push(window.setTimeout(() => {
         dispatch({ type: "AI_RESPONSE", content: reply, steps });
       }, 800));
     });
 
     return () => timers.forEach((t) => window.clearTimeout(t));
-  }, [state.conversation.length, dispatch, business?.name, profile?.displayName]);
+  }, [state.conversation.length, dispatch]);
 
   // Sync engine logs into activity
   React.useEffect(() => {
     const unsub = workforceEngine.subscribe((engine) => {
-      // Only add timelines we haven't seen yet
       const lastState = stateRef.current;
       const known = new Set(lastState.activity.map((a) => a.id));
       engine.timeline.slice(0, 5).forEach((t) => {
         if (!known.has(t.id)) {
-          // Map department name to tone
           const deptObj = DEPARTMENTS.find((d) => d.id === t.department);
           dispatch({
             type: "LOG",
