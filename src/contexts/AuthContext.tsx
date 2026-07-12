@@ -44,6 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
     if (auth) {
       import("firebase/auth").then(({ setPersistence, browserLocalPersistence }) => {
         setPersistence(auth, browserLocalPersistence).catch(console.error);
@@ -118,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
@@ -127,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithEmail = async (email: string, password: string) => {
+    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
@@ -136,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
+    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await firebaseUpdateProfile(result.user, { displayName });
@@ -146,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const sendOTP = async (email: string) => {
+    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
     const actionCodeSettings = {
       url: window.location.origin + "/auth/callback",
       handleCodeInApp: true,
@@ -156,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const verifyOTP = async (email: string, code: string): Promise<boolean> => {
+    if (!auth) return false;
     try {
       if (isSignInWithEmailLink(auth, window.location.href)) {
         const result = await signInWithEmailLink(auth, email, window.location.href);
@@ -168,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
+    if (!auth) throw new Error("Firebase not configured. Please set VITE_FIREBASE_API_KEY.");
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
@@ -177,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    if (!auth) { setProfile(null); setBusiness(null); return; }
     try {
       await signOut(auth);
       setProfile(null);

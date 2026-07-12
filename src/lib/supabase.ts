@@ -49,6 +49,11 @@ export function getSupabase(): SupabaseClient {
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
+      realtime: {
+        params: {
+          eventsPerSecond: 0,
+        },
+      },
     });
   }
   return supabase;
