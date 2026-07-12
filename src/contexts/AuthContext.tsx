@@ -106,11 +106,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [business, setBusiness] = useState<BusinessProfile>(MOCK_BUSINESS);
 
   const updateProfile = async (data: Partial<UserProfile>) => {
-    setProfile(prev => prev ? { ...prev, ...data } : null);
+    setProfile(prev => ({ ...prev, ...data }));
   };
 
   const updateBusiness = async (data: Partial<BusinessProfile>) => {
-    setBusiness(prev => prev ? { ...prev, ...data } : null);
+    setBusiness(prev => ({ ...prev, ...data }));
   };
 
   const refreshProfile = async () => {};
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const completeOnboarding = async (data: OnboardingData): Promise<BusinessProfile> => {
     const newBusiness = createDefaultBusinessProfile("local-user", data);
     setBusiness(newBusiness);
-    setProfile(prev => prev ? { ...prev, businessId: newBusiness.id, onboardingComplete: true } : null);
+    setProfile(prev => ({ ...prev, businessId: newBusiness.id, onboardingComplete: true }));
     return newBusiness;
   };
 
