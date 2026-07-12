@@ -58,8 +58,16 @@ export function initializeFirebase() {
 
 // Initialize on client side
 if (typeof window !== "undefined") {
-  const { app: initializedApp } = initializeFirebase();
-  app = initializedApp;
+  try {
+    if (firebaseConfig.apiKey) {
+      const { app: initializedApp } = initializeFirebase();
+      app = initializedApp;
+    } else {
+      console.warn("Firebase not configured — VITE_FIREBASE_API_KEY is missing");
+    }
+  } catch (e) {
+    console.error("Firebase initialization error:", e);
+  }
 }
 
 // Initialize services
@@ -69,7 +77,7 @@ if (app) {
     db = getFirestore(app);
     storage = getStorage(app);
   } catch (e) {
-    console.error("Firebase initialization error:", e);
+    console.error("Firebase service initialization error:", e);
   }
 }
 

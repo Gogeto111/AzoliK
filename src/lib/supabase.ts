@@ -9,10 +9,39 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 let supabase: SupabaseClient | null = null;
 
+function noopChain(): any {
+  const chain: any = () => noopChain();
+  chain.select = () => noopChain();
+  chain.insert = () => noopChain();
+  chain.update = () => noopChain();
+  chain.delete = () => noopChain();
+  chain.eq = () => noopChain();
+  chain.neq = () => noopChain();
+  chain.gt = () => noopChain();
+  chain.gte = () => noopChain();
+  chain.lt = () => noopChain();
+  chain.lte = () => noopChain();
+  chain.or = () => noopChain();
+  chain.and = () => noopChain();
+  chain.order = () => noopChain();
+  chain.limit = () => noopChain();
+  chain.single = () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } });
+  chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
+  chain.then = (resolve: any) => resolve({ data: null, error: { message: "Supabase not configured" } });
+  return chain;
+}
+
 export function getSupabase(): SupabaseClient {
   if (!supabase) {
     if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error("Supabase credentials not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY");
+      console.warn("Supabase credentials not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY");
+      return new Proxy({} as any, {
+        get(_t, prop) {
+          if (prop === "from") return (_table: string) => noopChain();
+          if (prop === "auth") return { getUser: () => Promise.resolve({ data: { user: null }, error: null }) };
+          return undefined;
+        },
+      }) as SupabaseClient;
     }
     supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
