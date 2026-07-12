@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, collection, query, where, orderBy, limit as fsLimit, getDocs } from "@/lib/firebase";
 import type { BusinessProfile, Department, Task, Conversation } from "@/lib/firebase";
@@ -9,6 +9,9 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { softSpring, snappySpring, durations, ease } from "@/lib/motion";
+import { GreetingCard } from "@/components/dashboard/GreetingCard";
+import { DemoOverlay } from "@/components/demo/DemoOverlay";
+import type { DemoMetrics } from "@/components/demo/DemoOverlay";
 import {
   Loader2,
   Check,
@@ -21,6 +24,8 @@ import {
   Target,
   Bot,
   Wrench,
+  MessageSquare,
+  Play,
 } from "lucide-react";
 import type { DepartmentId } from "@/types";
 
@@ -290,8 +295,37 @@ const itemVariant = {
 export default function Dashboard() {
   useEngineStart();
   const engine = useEngine();
-  const { business } = useAuth();
+  const { business, profile } = useAuth();
   const supabase = useDashboardData();
+  const [showGreeting, setShowGreeting] = useState(true);
+  const [showDemo, setShowDemo] = useState(false);
+  const [demoMetrics, setDemoMetrics] = useState<DemoMetrics | null>(null);
+  const [animRevenue, setAnimRevenue] = useState(0);
+  const [animSales, setAnimSales] = useState(0);
+  const [animSupport, setAnimSupport] = useState(0);
+  const animRef = useRef<number>(0);
+
+  // Animate KPI counters when demo completes
+  useEffect(() => {
+    if (!demoMetrics) return;
+    const duration = 700;
+    const start = performance.now();
+    const from = { r: 0, s: 0, c: 0 };
+    const to = { r: demoMetrics.revenueChange, s: demoMetrics.salesChange, c: demoMetrics.supportChange };
+
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setAnimRevenue(Math.round(from.r + (to.r - from.r) * ease));
+      setAnimSales(Math.round(from.s + (to.s - from.s) * ease));
+      setAnimSupport(Math.round(from.c + (to.c - from.c) * ease));
+      if (t < 1) animRef.current = requestAnimationFrame(tick);
+    };
+    animRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [demoMetrics]);
+
+  const userName = profile?.displayName?.split(" ")[0] || "there";
 
   const activeTask = engine.activeTasks[0];
   const activeToolCalls = activeTask
@@ -329,6 +363,7 @@ export default function Dashboard() {
   }
 
   const m = engine.metrics;
+  const dm = demoMetrics;
 
   return (
     <motion.div
@@ -337,6 +372,16 @@ export default function Dashboard() {
       initial="hidden"
       animate="visible"
     >
+      {/* ── Greeting Card ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {showGreeting && (
+          <GreetingCard
+            userName={userName}
+            onDismiss={() => setShowGreeting(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ── Header ────────────────────────────────────────────── */}
       <motion.div
         variants={itemVariant}
@@ -351,6 +396,15 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowDemo(true)}
+            className="gap-1.5"
+          >
+            <Play className="h-3.5 w-3.5" />
+            See Departments Work
+          </Button>
           <Badge tone="emerald" dot pulse>
             {m.agentsWorking} agents working
           </Badge>
@@ -372,19 +426,19 @@ export default function Dashboard() {
           [
             {
               label: "Revenue Generated",
-              value: `₹${m.revenueGenerated.toLocaleString()}`,
+              value: `₹${(m.revenueGenerated + animRevenue).toLocaleString()}`,
               icon: IndianRupee,
               fallback: supabase.metrics.revenueAssisted,
               prefix: "₹",
             },
             {
               label: "Leads Closed",
-              value: m.leadsClosed.toLocaleString(),
+              value: (m.leadsClosed + animSales).toLocaleString(),
               icon: Target,
             },
             {
               label: "Customers Helped",
-              value: m.customersHelped.toLocaleString(),
+              value: (m.customersHelped + animSupport).toLocaleString(),
               icon: Users,
               fallback: supabase.metrics.customersHelped,
             },
@@ -455,7 +509,7 @@ export default function Dashboard() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-medium text-white text-sm truncate">
-                      {dept?.name}
+                      {dept?.personName || dept?.name}
                     </h3>
                     <Badge
                       tone={badge.tone}
@@ -471,7 +525,7 @@ export default function Dashboard() {
                   </p>
                   <div className="flex items-center gap-2 mt-1.5">
                     <span className="text-[10px] text-ink-500">
-                      {status.completedTasksToday} tasks today
+                      {dept?.personRole || `${dept?.name} Lead`}
                     </span>
                     <span className="text-ink-700">·</span>
                     <span className="text-[10px] text-ink-500">
@@ -730,6 +784,16 @@ export default function Dashboard() {
           </div>
         </motion.div>
       )}
+
+      {/* ── Demo Overlay ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {showDemo && (
+          <DemoOverlay
+            onComplete={(metrics) => setDemoMetrics(metrics)}
+            onDismiss={() => setShowDemo(false)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

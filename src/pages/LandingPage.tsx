@@ -91,7 +91,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                   transition={{ duration: 1.5, repeat: Infinity }}
                   className="h-2 w-2 rounded-full bg-brand-500"
                 />
-                <span className="font-semibold">Now live: AI Workforce OS</span>
+                <span className="font-semibold">Your business shouldn't stop when you do</span>
               </motion.span>
 
               <motion.h1
@@ -100,10 +100,10 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 transition={{ delay: 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-white leading-[1.05] mb-6"
               >
-                The operating system for a modern
+                Never lose another customer
                 <br />
                 <span className="bg-gradient-to-r from-white via-brand-200 to-white bg-clip-text text-transparent">
-                  AI-powered company
+                  while you're asleep.
                 </span>
               </motion.h1>
 
@@ -113,7 +113,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 transition={{ delay: 0.2, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                 className="text-lg sm:text-xl text-ink-300 max-w-2xl mx-auto leading-relaxed text-balance"
               >
-                Six AI departments. Forty-four specialized agents. One intelligent workspace that runs your business while you sleep.
+                Six AI departments working around the clock — so you can focus on growing your business, not managing it.
               </motion.p>
             </motion.div>
 
@@ -190,10 +190,10 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 Your AI Workforce
               </motion.span>
               <h2 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight text-white">
-                Six Departments. One Intelligent Workforce.
+                Your business runs 24/7. Now your team does too.
               </h2>
               <p className="mt-3 text-lg text-ink-300 max-w-2xl mx-auto">
-                Each department is a team of specialized AI agents that collaborate, hand off tasks, and execute real work — just like a human team.
+                Each department works around the clock — replying to customers, following up on leads, sending invoices, and managing operations. While you sleep.
               </p>
             </div>
 
@@ -297,10 +297,10 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                   <Sparkles className="h-8 w-8 text-white" />
                 </motion.div>
                 <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white mb-4">
-                  Ready to hire your AI workforce?
+                  Your business shouldn't stop when you do.
                 </h2>
                 <p className="text-lg text-ink-300 mb-8 max-w-lg mx-auto">
-                  Join 1,000+ businesses running on Azolik. Start free, cancel anytime.
+                  Join 1,000+ businesses that never sleep. Start free, cancel anytime.
                 </p>
                 <Button
                   size="lg"
@@ -331,7 +331,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 </div>
                 <span className="text-lg font-semibold text-white">Azolik</span>
               </div>
-              <p className="text-sm text-ink-400">The operating system for a modern AI-powered company.</p>
+              <p className="text-sm text-ink-400">Your business runs 24/7. Now your team does too.</p>
             </div>
             <div>
               <h4 className="font-medium text-white mb-3">Product</h4>

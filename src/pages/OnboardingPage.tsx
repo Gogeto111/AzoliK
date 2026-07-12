@@ -24,6 +24,7 @@ import { IntegrationsScreen } from "@/components/onboarding/screens/Integrations
 import { DepartmentsScreen } from "@/components/onboarding/screens/DepartmentsScreen";
 import { LaunchScreen } from "@/components/onboarding/screens/LaunchScreen";
 import { TrainingScreen } from "@/components/onboarding/screens/TrainingScreen";
+import { JarvisTransition } from "@/components/ui/JarvisTransition";
 import { db, collection, setDoc, doc as firestoreDoc } from "@/lib/firebase";
 import type { OnboardingData } from "@/lib/firebase";
 
@@ -157,41 +158,14 @@ export function OnboardingPage() {
           || ["support", "sales", "finance"];
         return <LaunchScreen departments={Array.isArray(selectedDepartments) ? selectedDepartments : ["support", "sales", "finance"]} onComplete={handleCompleteOnboarding} />;
       case "complete":
+        const completeDepts = onboardingData.departments?.departments
+          || onboardingData.departments
+          || ["support", "sales", "finance"];
         return (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 flex items-center justify-center p-4"
-          >
-            <GlassCard className="p-8 max-w-md w-full text-center">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 ring-1 ring-inset ring-white/10"
-              >
-                <CheckCircle2 className="h-10 w-10 text-emerald-400" />
-              </motion.div>
-              
-              <h2 className="text-2xl font-semibold text-white mb-2">
-                Your AI Workforce is Ready!
-              </h2>
-              <p className="text-ink-400 mb-6 max-w-sm mx-auto">
-                All departments are online and your AI agents are ready to work. 
-                Your business now runs on autopilot.
-              </p>
-              
-              <div className="space-y-3">
-                <Button onClick={() => navigate("/dashboard")} className="w-full gap-2">
-                  <CheckCircle2 className="h-5 w-5" />
-                  Go to Dashboard
-                </Button>
-                <Button variant="ghost" onClick={() => navigate("/")} className="w-full">
-                  Back to Home
-                </Button>
-              </div>
-            </GlassCard>
-          </motion.div>
+          <JarvisTransition
+            departments={Array.isArray(completeDepts) ? completeDepts : ["support", "sales", "finance"]}
+            onComplete={() => navigate("/dashboard")}
+          />
         );
       default:
         return <WelcomeScreen onContinue={() => setCurrentStep("auth")} />;

@@ -78,6 +78,8 @@ export type DepartmentConfig = {
   tagline: string;
   personality: string;
   systemPrompt: string;
+  personName?: string;
+  personRole?: string;
   icon: any; // lucide icon
   color: {
     primary: string;
