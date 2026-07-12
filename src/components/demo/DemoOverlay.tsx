@@ -31,7 +31,7 @@ interface DeptCard {
   action: string;
   active: boolean;
   done: boolean;
-  handoff: boolean;
+  handoff?: boolean;
 }
 
 const DEPARTMENTS: Omit<DeptCard, "active" | "done">[] = [
