@@ -376,14 +376,14 @@ export function AIDiscoveryScreen({ onComplete, onBack }: AIDiscoveryScreenProps
                         <MapPin className="h-4 w-4 text-ink-400" />
                         <span className="text-sm">{businessData.address}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-ink-400" />
-                        <span className="text-sm">{businessData.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-ink-400" />
-                        <span className="text-sm">{businessData.email || "Not found"}</span>
-                      </div>
+<div className="flex items-center gap-2">
+  <Phone className="h-4 w-4 text-ink-400" />
+  <span className="text-sm">{businessData.phone || "+91 97117 00199"}</span>
+</div>
+<div className="flex items-center gap-2">
+  <Mail className="h-4 w-4 text-ink-400" />
+  <span className="text-sm">{businessData.email || "aarishvimal1@gmail.com"}</span>
+</div>
                       <div className="flex items-center gap-2">
                         <Globe className="h-4 w-4 text-ink-400" />
                         <a href={businessData.website} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-400 hover:underline flex items-center gap-1">

@@ -45,6 +45,12 @@ export function LaunchScreen({ departments, onComplete }: LaunchScreenProps) {
     return () => clearInterval(interval);
   }, [departments]);
 
+  const handleComplete = () => {
+    // Redirect to Google Meet for scheduling a meeting
+    window.open("https://meet.google.com/azolik-demo", "_blank");
+    onComplete();
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -209,14 +215,20 @@ export function LaunchScreen({ departments, onComplete }: LaunchScreenProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ type: "spring", stiffness: 200, damping: 20 }}
               >
-                <Button
-                  size="lg"
-                  onClick={onComplete}
-                  className="w-full sm:w-auto gap-3 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 text-white font-semibold py-4 rounded-xl ring-1 ring-inset ring-emerald-500/30"
+                <a
+                  href="https://meet.google.com/azolik-demo"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <ArrowRight className="h-5 w-5" />
-                  Open Mission Control
-                </Button>
+                  <Button
+                    size="lg"
+                    onClick={onComplete}
+                    className="w-full sm:w-auto gap-3 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 text-white font-semibold py-4 rounded-xl ring-1 ring-inset ring-emerald-500/30"
+                  >
+                    <ArrowRight className="h-5 w-5" />
+                    Schedule Your Demo Meeting
+                  </Button>
+                </a>
               </motion.div>
             )}
           </AnimatePresence>

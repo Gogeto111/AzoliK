@@ -358,7 +358,7 @@ function ConfirmScreen({ data, onComplete, onBack }: { data: any; onComplete: ()
                   </div>
 
                   <div className="flex items-center gap-2 text-ink-300">
-                    <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                    <Sparkles className="h-4 w-4 text-amber-400" />
                     <span className="font-semibold text-white">{data.rating}</span>
                     <span className="text-sm">({data.reviewsCount} reviews)</span>
                   </div>
@@ -368,14 +368,14 @@ function ConfirmScreen({ data, onComplete, onBack }: { data: any; onComplete: ()
                       <MapPin className="h-4 w-4 text-ink-400" />
                       <span className="text-sm">{data.address}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-ink-400" />
-                      <span className="text-sm">{data.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-ink-400" />
-                      <span className="text-sm">{data.email}</span>
-                    </div>
+<div className="flex items-center gap-2">
+  <Phone className="h-4 w-4 text-ink-400" />
+  <span className="text-sm">{data.phone || "+91 97117 00199"}</span>
+</div>
+<div className="flex items-center gap-2">
+  <Mail className="h-4 w-4 text-ink-400" />
+  <span className="text-sm">{data.email || "aarishvimal1@gmail.com"}</span>
+</div>
                     <div className="flex items-center gap-2">
                       <Globe className="h-4 w-4 text-ink-400" />
                       <a href={data.website} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-400 hover:underline flex items-center gap-1">

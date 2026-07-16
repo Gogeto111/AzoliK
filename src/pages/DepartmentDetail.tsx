@@ -29,6 +29,8 @@ export default function DepartmentDetail() {
 
   const dept = DEPARTMENTS.find((d) => d.id === id);
 
+  const [paused, setPaused] = React.useState(false);
+
   if (!dept) {
     return (
       <div>
@@ -43,7 +45,6 @@ export default function DepartmentDetail() {
   const recentCalls = state.toolCalls.filter((c) => c.department === dept.id).slice(0, 6);
   const st = state.departmentStatus[dept.id];
   const isWorking = runningTasks.length > 0;
-  const [paused, setPaused] = React.useState(false);
 
   const togglePause = () => {
     // Pausing an individual dept stops the entire engine for simplicity in

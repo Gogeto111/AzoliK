@@ -81,7 +81,7 @@ function getInitialMessage(businessName: string, ownerName: string): string {
   const firstName = ownerName?.split(" ")[0] || "there";
   const business = businessName || "your business";
 
-  return `${greeting}, ${firstName}. Your workforce is online across all 6 departments. I'm ready to help coordinate ${business}. What would you like me to work on?`;
+  return `${greeting}, ${firstName}. Your workforce is online across all departments. I'm ready to help coordinate ${business}. What would you like me to work on?`;
 }
 
 const initialState: Omit<AIState, "dispatch"> = {
@@ -164,6 +164,41 @@ function stepsForIntent(): ReasoningStep[] {
   ];
 }
 
+// Business-related keywords to filter non-business questions
+const BUSINESS_KEYWORDS = [
+  "business", "company", "startup", "revenue", "sales", "customer", "client",
+  "support", "marketing", "finance", "operations", "hr", "human resources",
+  "employee", "team", "product", "service", "price", "pricing", "invoice",
+  "payment", "order", "inventory", "stock", "lead", "prospect", "deal",
+  "campaign", "advertising", "social media", "content", "brand", "growth",
+  "automation", "workflow", "process", "efficiency", "cost", "profit",
+  "budget", "expense", "tax", "compliance", "legal", "contract",
+  "meeting", "schedule", "calendar", "appointment", "demo", "consultation",
+  "integration", "tool", "software", "system", "platform", "api",
+  "whatsapp", "email", "gmail", "shopify", "stripe", "razorpay", "hubspot",
+  "zoho", "slack", "notion", "sheets", "calendar", "crm", "erp",
+  "azolik", "ai", "agent", "department", "workforce", "task", "agent",
+  "onboard", "hire", "recruit", "candidate", "interview", "offer",
+  "policy", "leave", "payroll", "benefits", "training", "performance",
+  "report", "analytics", "metric", "kpi", "dashboard", "insight",
+  "customer support", "customer service", "help desk", "ticket",
+  "faq", "knowledge base", "chatbot", "automation", "bot",
+];
+
+function isBusinessRelated(message: string): boolean {
+  const lowerMessage = message.toLowerCase();
+  return BUSINESS_KEYWORDS.some(keyword => lowerMessage.includes(keyword.toLowerCase()));
+}
+
+function getBusinessOnlyResponse(): string {
+  const responses = [
+    "I'm designed to help with business automation and workforce management. I can help you with:\n\n• Setting up AI departments (Support, Sales, Marketing, Finance, Operations, HR)\n• Connecting integrations (WhatsApp, Gmail, Shopify, Stripe, etc.)\n• Automating workflows and processes\n• Business analytics and reporting\n• Customer support automation\n• Lead generation and sales automation\n• Marketing campaign management\n• Financial operations and invoicing\n• HR and team management\n\nWhat would you like to work on for your business?",
+    "I specialize in business automation with Azolik. I can help you build and manage your AI workforce, but I can't answer general questions outside of business operations.\n\nAsk me about:\n• How to set up your Support department\n• Connecting WhatsApp for customer messages\n• Creating sales automation workflows\n• Setting up marketing campaigns\n• Automating invoice generation\n• HR onboarding processes\n\nWhat business challenge are you trying to solve?",
+    "I'm your AI business operations assistant. I'm here to help you automate and scale your business with AI departments.\n\nI can help with:\n📋 Department setup & configuration\n🔗 Tool integrations (WhatsApp, Gmail, Shopify, etc.)\n⚡ Workflow automation\n📊 Business analytics\n💰 Revenue & cost optimization\n👥 Team & HR management\n\nWhat would you like to automate today?",
+  ];
+  return responses[Math.floor(Math.random() * responses.length)];
+}
+
 // Call Gemini API with full business knowledge
 async function callGemini(
   customerMessage: string,
@@ -232,6 +267,14 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     if (!last || last.role !== "user") return;
 
     const customerMessage = last.content;
+    
+    // Check if message is business-related
+    if (!isBusinessRelated(customerMessage)) {
+      const businessResponse = getBusinessOnlyResponse();
+      dispatch({ type: "AI_RESPONSE", content: businessResponse, steps: [] });
+      return;
+    }
+
     const steps = stepsForIntent();
     dispatch({ type: "THINKING_START", text: "Coordinating across departments…", steps });
 

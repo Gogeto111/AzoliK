@@ -1,17 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRef } from "react";
+import { motion } from "framer-motion";
 import { useEngine, useEngineStart } from "@/lib/engine";
 import { DEPARTMENTS } from "@/data/departments";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { softSpring, snappySpring } from "@/lib/motion";
-import { DemoOverlay } from "@/components/demo/DemoOverlay";
-import type { DemoMetrics } from "@/components/demo/DemoOverlay";
+import { snappySpring } from "@/lib/motion";
 import type { DepartmentId } from "@/types";
 import {
   IndianRupee, Target, Users, Clock, Zap,
-  Loader2, Check, Bot, Wrench, Play,
+  Loader2, Check, Bot, Wrench,
 } from "lucide-react";
 
 const deptConfigMap = Object.fromEntries(DEPARTMENTS.map((d) => [d.id, d]));
@@ -51,37 +48,6 @@ const itemVariant = {
 export default function Dashboard() {
   useEngineStart();
   const engine = useEngine();
-  const [showDemo, setShowDemo] = useState(false);
-  const [demoMetrics, setDemoMetrics] = useState<DemoMetrics | null>(null);
-  const [animRevenue, setAnimRevenue] = useState(0);
-  const [animSales, setAnimSales] = useState(0);
-  const [animSupport, setAnimSupport] = useState(0);
-  const [showToast, setShowToast] = useState(false);
-  const animRef = useRef<number>(0);
-
-  useEffect(() => {
-    if (!demoMetrics) return;
-    const duration = 700;
-    const start = performance.now();
-    const from = { r: 0, s: 0, c: 0 };
-    const to = { r: demoMetrics.revenueChange, s: demoMetrics.salesChange, c: demoMetrics.supportChange };
-    const tick = (now: number) => {
-      const t = Math.min((now - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      setAnimRevenue(Math.round(from.r + (to.r - from.r) * ease));
-      setAnimSales(Math.round(from.s + (to.s - from.s) * ease));
-      setAnimSupport(Math.round(from.c + (to.c - from.c) * ease));
-      if (t < 1) animRef.current = requestAnimationFrame(tick);
-    };
-    animRef.current = requestAnimationFrame(tick);
-    const toastTimer = window.setTimeout(() => setShowToast(true), 900);
-    const hideTimer = window.setTimeout(() => setShowToast(false), 5000);
-    return () => {
-      cancelAnimationFrame(animRef.current);
-      clearTimeout(toastTimer);
-      clearTimeout(hideTimer);
-    };
-  }, [demoMetrics]);
 
   const m = engine.metrics;
   const activeTask = engine.activeTasks[0];
@@ -106,20 +72,14 @@ export default function Dashboard() {
             {engine.businessName} — Your AI workforce in action
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setShowDemo(true)} className="gap-1.5">
-            <Play className="h-3.5 w-3.5" />
-            See AI Departments in Action
-          </Button>
-        </div>
       </motion.div>
 
       {/* KPI Strip */}
       <motion.div variants={itemVariant} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {([
-          { label: "Revenue Generated", value: `₹${(m.revenueGenerated + animRevenue).toLocaleString()}`, icon: IndianRupee },
-          { label: "Leads Closed", value: (m.leadsClosed + animSales).toLocaleString(), icon: Target },
-          { label: "Customers Helped", value: (m.customersHelped + animSupport).toLocaleString(), icon: Users },
+          { label: "Revenue Generated", value: `₹${m.revenueGenerated.toLocaleString()}`, icon: IndianRupee },
+          { label: "Leads Closed", value: m.leadsClosed.toLocaleString(), icon: Target },
+          { label: "Customers Helped", value: m.customersHelped.toLocaleString(), icon: Users },
           { label: "Hours Saved", value: `${Math.round(m.hoursSaved)}h`, icon: Clock },
           { label: "Automations", value: m.automationsCompleted.toLocaleString(), icon: Zap },
         ] as const).map((kpi, i) => (
@@ -316,34 +276,6 @@ export default function Dashboard() {
           </div>
         </motion.div>
       )}
-
-      {/* Demo Overlay */}
-      <AnimatePresence>
-        {showDemo && (
-          <DemoOverlay
-            onComplete={(metrics) => setDemoMetrics(metrics)}
-            onDismiss={() => setShowDemo(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Post-demo toast */}
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 300, damping: 24 }}
-            className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
-          >
-            <div className="flex items-center gap-2.5 rounded-xl bg-emerald-500/15 px-4 py-2.5 ring-1 ring-emerald-500/20 backdrop-blur-md">
-              <Check className="h-4 w-4 text-emerald-400" strokeWidth={2.5} />
-              <span className="text-sm font-medium text-emerald-200">Sale completed automatically — your business never stops.</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }

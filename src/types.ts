@@ -24,7 +24,7 @@ export type ToolCall = {
 
 export type MemoryEntry = {
   id: string;
-  type: "customer" | "product" | "policy" | "conversation" | "task" | "preference";
+  type: "customer" | "product" | "service" | "policy" | "conversation" | "task" | "preference";
   key: string;
   value: string;
   source: DepartmentId;

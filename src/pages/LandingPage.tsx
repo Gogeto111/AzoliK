@@ -1,5 +1,6 @@
 // Landing Page - The entry point before authentication
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useRef, useEffect } from "react";
 import { 
   Sparkles, 
   ArrowRight, 
@@ -9,16 +10,25 @@ import {
   Shield, 
   Globe, 
   Clock,
-  Building2,
   MessageSquare,
   BarChart3,
   Wallet,
   Cpu,
-  Zap as ZapIcon
+  Zap as ZapIcon,
+  Mail,
+  Phone,
+  MapPin,
+  Send,
+  CheckCircle2,
+  Loader2,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 const DEPARTMENTS = [
   { name: "Support", icon: MessageSquare, color: "from-cyan-500 to-cyan-700", description: "Never lose a customer while you're asleep. 24/7 replies, FAQs, order tracking.", agents: 8 },
@@ -35,32 +45,219 @@ const FEATURES = [
   { icon: Shield, title: "You Stay in Control", desc: "Approve, edit, or auto-send. Your AI team works for you — not instead of you." },
   { icon: Globe, title: "Works Where You Work", desc: "WhatsApp, Gmail, Sheets, Calendar, Razorpay, Shopify — connected in one click." },
   { icon: Cpu, title: "Learns Your Business", desc: "Your products, prices, policies, FAQs — all loaded in. It knows your business like a 2-year employee." },
-  { icon: Users, title: "5 Minutes to Go Live", desc: "Sign up. Tell us about your business. Your AI workforce starts working. No engineers needed." },
+  { icon: Users, title: "Quick Setup", desc: "Sign up. Tell us about your business. Your AI workforce starts working. No engineers needed." },
 ];
 
+const INDUSTRIES = [
+  { id: "restaurant", label: "Restaurant & Food", icon: "🍽️" },
+  { id: "retail", label: "Retail & E-commerce", icon: "🛍️" },
+  { id: "healthcare", label: "Healthcare & Clinics", icon: "🏥" },
+  { id: "fitness", label: "Fitness & Wellness", icon: "💪" },
+  { id: "beauty", label: "Beauty & Salon", icon: "💄" },
+  { id: "services", label: "Professional Services", icon: "💼" },
+  { id: "manufacturing", label: "Manufacturing", icon: "🏭" },
+  { id: "education", label: "Education & Training", icon: "📚" },
+  { id: "real-estate", label: "Real Estate", icon: "🏠" },
+  { id: "automotive", label: "Automotive", icon: "🚗" },
+  { id: "hospitality", label: "Hospitality & Travel", icon: "🏨" },
+  { id: "other", label: "Other", icon: "✨" },
+];
+
+// 3D Floating Cards Component
+function Floating3DCard({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width - 0.5) * 30;
+      const y = ((e.clientY - rect.top) / rect.height - 0.5) * -30;
+      setMousePos({ x, y });
+    };
+
+    const handleMouseLeave = () => {
+      setMousePos({ x: 0, y: 0 });
+    };
+
+    el.addEventListener("mousemove", handleMouseMove);
+    el.addEventListener("mouseleave", handleMouseLeave);
+    return () => {
+      el.removeEventListener("mousemove", handleMouseMove);
+      el.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, []);
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 30, rotateX: -10 }}
+      animate={{ opacity: 1, y: 0, rotateX: 0 }}
+      transition={{ delay, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      style={{
+        transform: `perspective(1000px) rotateY(${mousePos.x}deg) rotateX(${mousePos.y}deg)`,
+        transformStyle: "preserve-3d",
+      }}
+      className="relative"
+    >
+      <div className="relative" style={{ transform: "translateZ(50px)", transformStyle: "preserve-3d" }}>
+        {children}
+      </div>
+      {/* 3D Glow Layers */}
+      <div
+        className="absolute inset-0 bg-gradient-to-br from-brand-500/20 via-transparent to-violet-500/20 rounded-2xl"
+        style={{
+          transform: "translateZ(-20px) scale(1.05)",
+          filter: "blur(30px)",
+          opacity: 0.5,
+          transformStyle: "preserve-3d",
+        }}
+      />
+      <div
+        className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-emerald-500/10 rounded-2xl"
+        style={{
+          transform: "translateZ(-40px) scale(1.1)",
+          filter: "blur(60px)",
+          opacity: 0.3,
+          transformStyle: "preserve-3d",
+        }}
+      />
+    </motion.div>
+  );
+}
+
+// 3D Orb Background
+function Orb3DBackground() {
+  const [orbs] = useState([
+    { x: 20, y: 20, size: 400, color: "brand", delay: 0 },
+    { x: 80, y: 30, size: 300, color: "violet", delay: 2 },
+    { x: 60, y: 80, size: 350, color: "cyan", delay: 4 },
+    { x: 10, y: 70, size: 250, color: "emerald", delay: 1 },
+    { x: 90, y: 60, size: 280, color: "amber", delay: 3 },
+  ]);
+
+  return (
+    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+      {orbs.map((orb, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full blur-[200px] opacity-30"
+          style={{
+            left: `${orb.x}%`,
+            top: `${orb.y}%`,
+            width: `${orb.size}px`,
+            height: `${orb.size}px`,
+            marginLeft: `-${orb.size / 2}px`,
+            marginTop: `-${orb.size / 2}px`,
+            background: `radial-gradient(circle at 30% 30%, ${orb.color === "brand" ? "rgba(95,131,255,0.6)" : orb.color === "violet" ? "rgba(167,139,250,0.5)" : orb.color === "cyan" ? "rgba(34,211,238,0.4)" : orb.color === "emerald" ? "rgba(52,211,153,0.4)" : "rgba(251,191,36,0.4)"}, transparent 70%)`,
+          }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: [1, 1.15, 1], opacity: 1, x: [-20, 20, -20], y: [-10, 10, -10] }}
+          transition={{
+            opacity: { delay: orb.delay, duration: 1.5, ease: [0.22, 1, 0.36, 1] },
+            scale: { delay: orb.delay, duration: 4, repeat: Infinity, ease: "easeInOut" },
+            x: { delay: orb.delay, duration: 8, repeat: Infinity, ease: "easeInOut" },
+            y: { delay: orb.delay, duration: 6, repeat: Infinity, ease: "easeInOut" },
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// 3D Grid Pattern
+function Grid3DPattern() {
+  return (
+    <div
+      className="absolute inset-0 -z-10 opacity-10"
+      style={{
+        backgroundImage: `
+          linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+        `,
+        backgroundSize: "60px 60px",
+        transform: "perspective(1000px) rotateX(60deg) translateZ(-100px) translateY(100px)",
+        transformOrigin: "center top",
+      }}
+    />
+  );
+}
+
 export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
+  const [showGetInTouch, setShowGetInTouch] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    company: "",
+    industry: "",
+    message: "",
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [showMeetingScheduler, setShowMeetingScheduler] = useState(false);
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = "Name is required";
+    if (!formData.email.trim()) errors.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Invalid email format";
+    if (!formData.phone.trim()) errors.phone = "Phone is required";
+    else if (!/^[\d\s\-+()]{10,}$/.test(formData.phone)) errors.phone = "Invalid phone number";
+    if (!formData.company.trim()) errors.company = "Company name is required";
+    if (!formData.industry) errors.industry = "Please select your industry";
+    if (!formData.message.trim()) errors.message = "Message is required";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+    
+    setIsSubmitting(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSubmitting(false);
+    setSubmitSuccess(true);
+    setShowMeetingScheduler(true);
+  };
+
+  const handleIndustryChange = (industry: string) => {
+    setFormData(prev => ({ ...prev, industry }));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 overflow-x-hidden">
-      {/* Animated background */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full bg-brand-500/10 blur-[200px] animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full bg-violet-500/10 blur-[200px] animate-pulse" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] rounded-full bg-emerald-500/05 blur-[200px] animate-pulse" style={{ animationDelay: '4s' }} />
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2760%27 height=%2760%27 viewBox=%270 0 60 60%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27none%27 fill-rule=%27evenodd%27%3E%3Cg fill=%27%23ffffff%27 fill-opacity=%270.015%27%3E%3Cpath d=%27M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%27/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')" />
-      </div>
+      {/* 3D Background System */}
+      <Orb3DBackground />
+      <Grid3DPattern />
 
       {/* Navigation */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-4 sm:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_8px_24px_-6px_rgba(95,131,255,0.6)]">
-            <Sparkles className="h-5 w-5 text-white" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_8px_24px_-6px_rgba(95,131,255,0.6)]">
+            <img 
+              src="/logo.svg" 
+              alt="Azolik Logo" 
+              className="h-6 w-6 object-contain"
+              onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                const sparkles = target.nextElementSibling as HTMLElement;
+                if (sparkles) sparkles.style.display = 'flex';
+              }}
+            />
+            <Sparkles className="h-5 w-5 text-white hidden" />
           </div>
           <span className="text-xl font-semibold tracking-tight text-white">Azolik</span>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="hidden sm:flex">
-            Sign in
+          <Button variant="ghost" size="sm" className="hidden sm:flex" onClick={() => setShowGetInTouch(true)}>
+            Let's Talk
           </Button>
           <Button size="sm" onClick={onGetStarted} className="gap-2">
             <Sparkles className="h-4 w-4" />
@@ -142,31 +339,35 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 See Live Demo
               </Button>
             </motion.div>
+          </div>
+        </section>
 
-            {/* Trust indicators */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-16 flex flex-wrap items-center justify-center gap-8 text-ink-500 text-sm"
-            >
-              <span className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-emerald-500" />
-                SOC 2 Certified
-              </span>
-              <span className="flex items-center gap-2">
-                <ZapIcon className="h-4 w-4 text-emerald-500" />
-                99.9% Uptime
-              </span>
-              <span className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-emerald-500" />
-                1,000+ Businesses
-              </span>
-              <span className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-emerald-500" />
-                5-min Setup
-              </span>
-            </motion.div>
+        {/* Stats Strip */}
+        <section className="py-12 px-6 sm:px-8 border-y border-white/5 bg-ink-950/50">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {[
+                { value: "500+", label: "Businesses Automated", icon: Bot },
+                { value: "24/7", label: "AI Coverage", icon: Clock },
+                { value: "<2min", label: "Average Response", icon: Zap },
+                { value: "98%", label: "Customer Satisfaction", icon: CheckCircle2 },
+              ].map((stat, i) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1, duration: 0.5 }}
+                  className="text-center"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-inset ring-brand-500/20 mx-auto mb-3">
+                    <stat.icon className="h-5 w-5 text-brand-400" />
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{stat.value}</p>
+                  <p className="text-sm text-ink-400 mt-1">{stat.label}</p>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -276,6 +477,265 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           </motion.div>
         </section>
 
+        {/* How It Works */}
+        <section className="py-16 sm:py-24 px-6 sm:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-5xl mx-auto"
+          >
+            <div className="text-center mb-16">
+              <motion.span
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 22 }}
+                className="inline-flex items-center gap-2 rounded-full bg-violet-500/15 border border-violet-500/30 px-3 py-1 text-xs font-medium text-violet-300"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-pulse" />
+                Simple Setup
+              </motion.span>
+              <h2 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+                Up and running in 3 steps
+              </h2>
+              <p className="mt-3 text-lg text-ink-300 max-w-2xl mx-auto">
+                No engineers. No months of implementation. Your AI workforce starts working today.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8 relative">
+              <div className="hidden md:block absolute top-12 left-[16.67%] right-[16.67%] h-px bg-gradient-to-r from-transparent via-brand-500/30 to-transparent" />
+              {[
+                {
+                  step: "01",
+                  title: "Tell Us About Your Business",
+                  desc: "Share your products, pricing, policies, and FAQs. It takes about 15 minutes.",
+                  icon: MessageSquare,
+                  color: "from-cyan-500 to-cyan-700",
+                },
+                {
+                  step: "02",
+                  title: "We Build Your AI Team",
+                  desc: "We configure and train your six AI departments to match your business exactly.",
+                  icon: Cpu,
+                  color: "from-brand-500 to-brand-700",
+                },
+                {
+                  step: "03",
+                  title: "Your Business Runs 24/7",
+                  desc: "Connect your channels and watch your AI team handle customers, leads, and operations.",
+                  icon: Zap,
+                  color: "from-emerald-500 to-emerald-700",
+                },
+              ].map((item, i) => (
+                <motion.div
+                  key={item.step}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ delay: i * 0.15, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                  className="relative text-center"
+                >
+                  <div className={cn(
+                    "flex h-16 w-16 items-center justify-center rounded-2xl mx-auto mb-5 ring-1 ring-inset ring-white/10",
+                    `bg-gradient-to-br ${item.color}`
+                  )}>
+                    <item.icon className="h-7 w-7 text-white" />
+                  </div>
+                  <span className="inline-block text-xs font-bold text-brand-400 tracking-widest mb-2">STEP {item.step}</span>
+                  <h3 className="text-lg font-semibold text-white mb-2">{item.title}</h3>
+                  <p className="text-sm text-ink-300 leading-relaxed max-w-xs mx-auto">{item.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </section>
+
+        {/* Get in Touch Section */}
+        <section className="py-16 sm:py-24 px-6 sm:px-8" id="get-in-touch">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-5xl mx-auto"
+          >
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+                Get in Touch
+              </h2>
+              <p className="mt-3 text-lg text-ink-300 max-w-2xl mx-auto">
+                Have questions? Want to see a demo? Our team is ready to help you automate your business.
+              </p>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* Contact Info */}
+              <GlassCard className="p-8 h-full">
+                <h3 className="text-xl font-semibold text-white mb-6">Contact Information</h3>
+                <div className="space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 ring-1 ring-inset ring-brand-500/20">
+                      <Mail className="h-6 w-6 text-brand-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-white">Email</h4>
+                      <p className="mt-1 text-ink-300">aarishvimal1@gmail.com</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 ring-1 ring-inset ring-brand-500/20">
+                      <Phone className="h-6 w-6 text-brand-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-white">Phone</h4>
+                      <p className="mt-1 text-ink-300">+91 97117 00199</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 ring-1 ring-inset ring-brand-500/20">
+                      <MapPin className="h-6 w-6 text-brand-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-white">Office</h4>
+                      <p className="mt-1 text-ink-300">Available worldwide — remote first</p>
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* Contact Form */}
+              <GlassCard className="p-8">
+                <h3 className="text-xl font-semibold text-white mb-6">
+                  {submitSuccess ? "Request Submitted!" : "Send us a Message"}
+                </h3>
+                
+                {submitSuccess ? (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="h-16 w-16 text-emerald-400 mx-auto mb-4" />
+                    <h4 className="text-xl font-semibold text-white mb-2">Thanks for reaching out!</h4>
+                    <p className="text-ink-300 mb-6">We'll get back to you within 24 hours. Ready to schedule a meeting?</p>
+                    <Button 
+                      size="lg" 
+                      onClick={() => {
+                        setShowGetInTouch(false);
+                        setShowMeetingScheduler(true);
+                        setSubmitSuccess(false);
+                      }}
+                      className="gap-2 w-full"
+                    >
+                      <Send className="h-4 w-4" />
+                      Schedule a Meeting
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="name" className="block text-sm font-medium text-ink-300 mb-1">Full Name *</label>
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="John Doe"
+                          error={formErrors.name}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="email" className="block text-sm font-medium text-ink-300 mb-1">Email *</label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="john@company.com"
+                          error={formErrors.email}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="phone" className="block text-sm font-medium text-ink-300 mb-1">Phone *</label>
+                        <Input
+                          id="phone"
+                          value={formData.phone}
+                          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                          placeholder="+91 97117 00199"
+                          error={formErrors.phone}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="company" className="block text-sm font-medium text-ink-300 mb-1">Company *</label>
+                        <Input
+                          id="company"
+                          value={formData.company}
+                          onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
+                          placeholder="Acme Inc."
+                          error={formErrors.company}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="industry" className="block text-sm font-medium text-ink-300 mb-1">Industry *</label>
+                      <div className="relative">
+                        <select
+                          id="industry"
+                          value={formData.industry}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleIndustryChange(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-ink-900/50 px-4 py-3 text-white placeholder:text-ink-500 focus:border-brand-400/40 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-all appearance-none bg-no-repeat bg-right pr-10 cursor-pointer"
+                          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238faeff'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' strokeWidth='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E\")" }}
+                        >
+                          <option value="">Select your industry</option>
+                          {INDUSTRIES.map((ind) => (
+                            <option key={ind.id} value={ind.id}>{ind.label}</option>
+                          ))}
+                        </select>
+                        {formErrors.industry && (
+                          <p className="mt-1 text-sm text-rose-400">{formErrors.industry}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="message" className="block text-sm font-medium text-ink-300 mb-1">Message *</label>
+                      <Textarea
+                        id="message"
+                        value={formData.message}
+                        onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+                        placeholder="Tell us about your business and what you're looking for..."
+                        rows={4}
+                        error={formErrors.message}
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={isSubmitting}
+                      className="w-full gap-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" />
+                          Send Message
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-center text-xs text-ink-500">
+                      By submitting, you agree to our Privacy Policy and Terms of Service.
+                    </p>
+                  </form>
+                )}
+              </GlassCard>
+            </div>
+          </motion.div>
+        </section>
+
         {/* CTA Section */}
         <section className="py-16 sm:py-24 px-6 sm:px-8">
           <motion.div
@@ -300,7 +760,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                   Your business shouldn't stop when you do.
                 </h2>
                 <p className="text-lg text-ink-300 mb-8 max-w-lg mx-auto">
-                  Join 1,000+ businesses that never sleep. Start free, cancel anytime.
+                  Join thousands of businesses that never sleep. Start free, cancel anytime.
                 </p>
                 <Button
                   size="lg"
@@ -364,6 +824,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           </div>
           <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-sm text-ink-500">© 2025 Azolik. All rights reserved.</p>
+            <div className="flex items-center gap-4">
               <a href="#" className="text-ink-400 hover:text-white transition-colors" aria-label="Twitter">
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
               </a>
@@ -375,7 +836,220 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               </a>
             </div>
           </div>
-</footer>
-      </div>
+        </div>
+      </footer>
+
+      {/* Get in Touch Modal */}
+      <AnimatePresence>
+        {showGetInTouch && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowGetInTouch(false)}
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GlassCard className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" tone="strong">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-white">Get in Touch</h2>
+                    <p className="mt-1 text-ink-400">We'd love to hear from you. Send us a message and we'll respond within 24 hours.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowGetInTouch(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {submitSuccess ? (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="h-16 w-16 text-emerald-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-white mb-2">Thanks for reaching out!</h3>
+                    <p className="text-ink-300 mb-6">We'll get back to you within 24 hours.</p>
+                    <Button 
+                      size="lg" 
+                      onClick={() => {
+                        setShowGetInTouch(false);
+                        setShowMeetingScheduler(true);
+                        setSubmitSuccess(false);
+                      }}
+                      className="gap-2 w-full"
+                    >
+                      <Send className="h-4 w-4" />
+                      Schedule a Meeting
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="modal-name" className="block text-sm font-medium text-ink-300 mb-1">Full Name *</label>
+                        <Input
+                          id="modal-name"
+                          value={formData.name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="John Doe"
+                          error={formErrors.name}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="modal-email" className="block text-sm font-medium text-ink-300 mb-1">Email *</label>
+                        <Input
+                          id="modal-email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="john@company.com"
+                          error={formErrors.email}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="modal-phone" className="block text-sm font-medium text-ink-300 mb-1">Phone *</label>
+                        <Input
+                          id="modal-phone"
+                          value={formData.phone}
+                          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                          placeholder="+91 97117 00199"
+                          error={formErrors.phone}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="modal-company" className="block text-sm font-medium text-ink-300 mb-1">Company *</label>
+                        <Input
+                          id="modal-company"
+                          value={formData.company}
+                          onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
+                          placeholder="Acme Inc."
+                          error={formErrors.company}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="modal-industry" className="block text-sm font-medium text-ink-300 mb-1">Industry *</label>
+                      <div className="relative">
+                        <select
+                          id="modal-industry"
+                          value={formData.industry}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleIndustryChange(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-ink-900/50 px-4 py-3 text-white placeholder:text-ink-500 focus:border-brand-400/40 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-all appearance-none bg-no-repeat bg-right pr-10 cursor-pointer"
+                          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238faeff'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' strokeWidth='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E\")" }}
+                        >
+                          <option value="">Select your industry</option>
+                          {INDUSTRIES.map((ind) => (
+                            <option key={ind.id} value={ind.id}>{ind.label}</option>
+                          ))}
+                        </select>
+                        {formErrors.industry && (
+                          <p className="mt-1 text-sm text-rose-400">{formErrors.industry}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="modal-message" className="block text-sm font-medium text-ink-300 mb-1">Message *</label>
+                      <Textarea
+                        id="modal-message"
+                        value={formData.message}
+                        onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+                        placeholder="Tell us about your business and what you're looking for..."
+                        rows={4}
+                        error={formErrors.message}
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={isSubmitting}
+                      className="w-full gap-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" />
+                          Send Message
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-center text-xs text-ink-500">
+                      By submitting, you agree to our Privacy Policy and Terms of Service.
+                    </p>
+                  </form>
+                )}
+              </GlassCard>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Meeting Scheduler Modal - Redirects to Google Meet */}
+      <AnimatePresence>
+        {showMeetingScheduler && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowMeetingScheduler(false)}
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GlassCard className="w-full max-w-md" tone="strong">
+                <div className="text-center py-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 mx-auto mb-4">
+                    <Sparkles className="h-8 w-8 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-white mb-2">Schedule a Meeting</h2>
+                  <p className="text-ink-300 mb-6">Book a 30-minute Google Meet call with our team to discuss how Azolik can automate your business.</p>
+                  <a
+                    href="https://meet.google.com/azolik-demo"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full"
+                  >
+                    <Button size="lg" className="gap-2 w-full bg-gradient-to-r from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600">
+                      <Send className="h-4 w-4" />
+                      Open Google Meet Scheduler
+                    </Button>
+                  </a>
+                  <p className="mt-4 text-sm text-ink-500">Or email us directly at <a href="mailto:aarishvimal1@gmail.com" className="text-brand-400 hover:underline">aarishvimal1@gmail.com</a></p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowMeetingScheduler(false)}
+                    className="mt-4 gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    Close
+                  </Button>
+                </div>
+              </GlassCard>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

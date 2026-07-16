@@ -11,6 +11,7 @@ import {
   IndianRupee, Target, Timer,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEngine, useEngineStart } from "@/lib/engine";
@@ -179,6 +180,7 @@ export default function AIWorkforce() {
 }
 
 function DepartmentLiveCard({ dept, index, state, prefersReduced }: { dept: any; index: number; state: any; prefersReduced: boolean }) {
+  const navigate = useNavigate();
   const Icon = DEPT_ICONS[dept.id];
   const deptStatus = state.departmentStatus[dept.id];
   const isWorking = deptStatus?.tone === "working";
@@ -297,7 +299,7 @@ function DepartmentLiveCard({ dept, index, state, prefersReduced }: { dept: any;
             </div>
 
             <div className="flex flex-col gap-2 md:flex-row">
-              <Button size="sm" variant="secondary" className="gap-1">
+              <Button size="sm" variant="secondary" className="gap-1" onClick={() => navigate(`/departments/${dept.id}`)}>
                 <Eye className="h-3.5 w-3.5" /> View Details
               </Button>
               <Button size="sm" variant="ghost" className="text-[11px]">

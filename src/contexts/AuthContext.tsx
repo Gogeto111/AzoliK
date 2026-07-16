@@ -11,7 +11,7 @@ import {
 
 const MOCK_USER = {
   uid: "local-user",
-  email: "user@azolik.com",
+  email: "aarishvimal1@gmail.com",
   displayName: "User",
   emailVerified: true,
   isAnonymous: false,
@@ -24,14 +24,14 @@ const MOCK_USER = {
   getIdTokenResult: () => Promise.resolve({} as any),
   reload: async () => {},
   toJSON: () => ({}),
-  phoneNumber: null,
+  phoneNumber: "9711700199",
   photoURL: null,
   providerId: "local",
 } as unknown as User;
 
 const MOCK_PROFILE: UserProfile = {
   uid: "local-user",
-  email: "user@azolik.com",
+  email: "aarishvimal1@gmail.com",
   displayName: "User",
   businessId: "local-business",
   onboardingComplete: true,
@@ -53,7 +53,7 @@ const MOCK_BUSINESS: BusinessProfile = {
   name: "My Business",
   type: "ecommerce",
   ownerId: "local-user",
-  phone: "+919999999999",
+  phone: "9711700199",
   currency: "INR",
   timezone: "Asia/Kolkata",
   settings: {
